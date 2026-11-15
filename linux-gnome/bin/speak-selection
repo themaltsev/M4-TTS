@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export PATH="$HOME/.local/bin:/usr/bin:/bin:$PATH"
+
+state="${XDG_RUNTIME_DIR:-/tmp}/macbook-tts-$UID"
+mkdir -p "$state"
+pidfile="$state/worker.pid"
+tick_pid=""
+indicator_pid=""
+worker_pidfile=""
+
+stop_ticking() {
+  if [[ -n "$tick_pid" ]]; then
+    kill "$tick_pid" 2>/dev/null || true
+    wait "$tick_pid" 2>/dev/null || true
+    tick_pid=""
+  fi
+}
+
+start_indicator() {
+  /usr/bin/python3 "$HOME/.local/bin/tts-panel-indicator.py" > /dev/null 2> "$state/indicator.log" &
+  indicator_pid=$!
+}
+
+stop_indicator() {
+  if [[ -n "$indicator_pid" ]]; then
+    kill "$indicator_pid" 2>/dev/null || true
+    wait "$indicator_pid" 2>/dev/null || true
+    indicator_pid=""
+  fi
+}
+
+cleanup_worker() {
+  stop_ticking
+  stop_indicator
+  if [[ -n "$worker_pidfile" ]] && [[ "$(cat "$worker_pidfile" 2>/dev/null || true)" == "$BASHPID" ]]; then
+    rm -f -- "$worker_pidfile"
+  fi
+}
+
+worker() {
+  local text="$1"
+  # Уменьшаем паузы при озвучивании
+  text="${text//,/ }"
+  text="${text//./,}"
+  text="${text//$'\n'/ }"
+
+  # Do not let GNOME associate the background audio player with an app launch in the dock.
+  unset DESKTOP_STARTUP_ID GIO_LAUNCHED_DESKTOP_FILE GIO_LAUNCHED_DESKTOP_FILE_PID
+
+  tick_pid=""
+  start_indicator
+  # Start one quiet tick after each full second while the online voice is being prepared.
+  (
+    tick_player=""
+    tick_sleep=""
+    stop_tick_loop() {
+      if [[ -n "$tick_sleep" ]]; then kill "$tick_sleep" 2>/dev/null || true; fi
+      if [[ -n "$tick_player" ]]; then kill "$tick_player" 2>/dev/null || true; fi
+      exit 0
+    }
+    trap stop_tick_loop TERM INT
+    while :; do
+      sleep 1 &
+      tick_sleep=$!
+      wait "$tick_sleep" || break
+      tick_sleep=""
+      canberra-gtk-play --file="$HOME/.local/share/sounds/openclaw-soft-tick.wav" --volume=-12.0 >/dev/null 2>&1 &
+      tick_player=$!
+      wait "$tick_player" || true
+      tick_player=""
+    done
+  ) &
+  tick_pid=$!
+
+  local stream_ok=0
+  local stream_attempt
+  for stream_attempt in 1 2 3; do
+    if TTS_TICK_PID="$tick_pid" "$HOME/.local/share/pipx/venvs/edge-tts/bin/python" \
+        "$HOME/.local/bin/edge-tts-stream.py" "$text" |
+        mpv --no-video --speed=1.35 --really-quiet --cache=no -; then
+      stream_ok=1
+      break
+    fi
+
+    # Do not replay speech if the stream failed after delivering its first audio chunk.
+    if grep -q "^TTS_FIRST_AUDIO" "$state/tts.log"; then
+      stop_ticking
+      notify-send "Озвучивание" "Аудиопоток прервался после начала; смотри tts.log" || true
+      return 1
+    fi
+
+    # Edge TTS can occasionally close a valid request before sending any audio.
+    case "$stream_attempt" in
+      1) sleep 1 ;;
+      2) sleep 2 ;;
+    esac
+  done
+
+  if [[ "$stream_ok" -eq 1 ]]; then
+    stop_ticking
+    return 0
+  fi
+
+  stop_ticking
+  notify-send "Озвучивание" "Edge TTS не прислал аудио после трёх потоковых попыток; смотри tts.log" || true
+  return 1
+}
+
+if [[ "${1:-}" == "--worker" ]]; then
+  worker_pidfile="$state/worker.pid"
+  trap cleanup_worker EXIT
+  trap 'exit 143' TERM
+  trap 'exit 130' INT
+  worker "$2" || exit $?
+  exit 0
+fi
+
+(
+  flock -x 9
+
+  if [[ -s "$pidfile" ]]; then
+    pid="$(cat "$pidfile")"
+    if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+      kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
+      rm -f -- "$pidfile"
+      canberra-gtk-play --file=/usr/share/sounds/freedesktop/stereo/dialog-information.oga --description="Озвучивание остановлено" --volume=-12.0 >/dev/null 2>&1 &
+      exit 0
+    fi
+    rm -f -- "$pidfile"
+  fi
+
+  if [[ -n "${WAYLAND_DISPLAY:-}" ]] && command -v wl-paste >/dev/null 2>&1; then
+    text="$(wl-paste --primary --no-newline 2>/dev/null || true)"
+  elif command -v xclip >/dev/null 2>&1; then
+    text="$(xclip -o -selection primary 2>/dev/null || true)"
+  elif command -v xsel >/dev/null 2>&1; then
+    text="$(xsel --output --primary 2>/dev/null || true)"
+  else
+    notify-send "Озвучивание" "Не найден способ прочитать выделение (wl-paste/xclip/xsel)" || true
+    exit 1
+  fi
+
+  if [[ -z "${text//[[:space:]]/}" ]]; then
+    notify-send "Озвучивание" "Сначала выдели текст" || true
+    exit 0
+  fi
+
+  canberra-gtk-play --file=/usr/share/sounds/Yaru/stereo/message-new-instant.oga --description="Озвучивание началось" --volume=-12.0 >/dev/null 2>&1 || true
+
+  setsid "$0" --worker "$text" \
+    9>&- >"$state/tts.log" 2>&1 </dev/null &
+
+  echo "$!" > "$pidfile"
+
+) 9>"$state/lock"
