@@ -1,39 +1,39 @@
-#!/usr/bin/python3
+from __future__ import annotations
+
 import os
-from pathlib import Path
 import signal
 import time
+from pathlib import Path
+
 import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("AyatanaAppIndicator3", "0.1")
-from gi.repository import GLib, Gtk, AyatanaAppIndicator3
+from gi.repository import AyatanaAppIndicator3, GLib, Gtk
 
-started_at = float(os.environ.get("TTS_STARTED_MONOTONIC", time.monotonic()))
 
 icons_dir = Path.home() / ".local/share/icons"
-icon = str(icons_dir / "openclaw-tts-waiting.svg")
+waiting_icon = str(icons_dir / "openclaw-tts-waiting.svg")
 waveform_icon = str(icons_dir / "openclaw-tts-waveform.svg")
+started_at = float(os.environ.get("SELECTED_TEXT_STARTED_MONOTONIC", time.monotonic()))
 indicator = AyatanaAppIndicator3.Indicator.new(
-    "openclaw-tts", icon,
-    AyatanaAppIndicator3.IndicatorCategory.APPLICATION_STATUS,
+    "openclaw-tts", waiting_icon, AyatanaAppIndicator3.IndicatorCategory.APPLICATION_STATUS
 )
-indicator.set_icon_full(icon, "Идёт озвучивание текста")
-indicator.set_title("Идёт озвучивание текста")
+indicator.set_icon_full(waiting_icon, "Ожидание речи")
+indicator.set_title("Подготовка озвучивания")
 menu = Gtk.Menu()
-status = Gtk.MenuItem(label="Идёт озвучивание текста")
+status = Gtk.MenuItem(label="Подготовка озвучивания")
 status.set_sensitive(False)
 menu.append(status)
 menu.show_all()
 indicator.set_menu(menu)
 indicator.set_status(AyatanaAppIndicator3.IndicatorStatus.ACTIVE)
 
-
 last_seconds = -1
 playback_started = False
 
 
-def update_elapsed():
+def update_elapsed() -> bool:
     global last_seconds
     if playback_started:
         return GLib.SOURCE_REMOVE
@@ -41,15 +41,14 @@ def update_elapsed():
     if seconds == last_seconds:
         return GLib.SOURCE_CONTINUE
     last_seconds = seconds
-    panel_label = f"{seconds}с"
-    indicator.set_label(panel_label, "888с")
-    description = f"Идёт озвучивание текста — {seconds} с"
+    indicator.set_label(f"{seconds}с", "888с")
+    description = f"Подготовка озвучивания — {seconds} с"
     indicator.set_title(description)
     status.set_label(description)
     return GLib.SOURCE_CONTINUE
 
 
-def switch_to_playing():
+def switch_to_playing() -> bool:
     global playback_started
     if playback_started:
         return GLib.SOURCE_REMOVE
@@ -61,16 +60,19 @@ def switch_to_playing():
     return GLib.SOURCE_REMOVE
 
 
-def on_playback_started(*_):
+def on_playback_started(*_args: object) -> None:
     GLib.idle_add(switch_to_playing)
 
 
-signal.signal(signal.SIGUSR1, on_playback_started)
+def main() -> int:
+    signal.signal(signal.SIGUSR1, on_playback_started)
+    signal.signal(signal.SIGTERM, lambda *_: Gtk.main_quit())
+    signal.signal(signal.SIGINT, lambda *_: Gtk.main_quit())
+    update_elapsed()
+    GLib.timeout_add(250, update_elapsed)
+    Gtk.main()
+    return 0
 
 
-update_elapsed()
-GLib.timeout_add(250, update_elapsed)
-
-signal.signal(signal.SIGTERM, lambda *_: Gtk.main_quit())
-signal.signal(signal.SIGINT, lambda *_: Gtk.main_quit())
-Gtk.main()
+if __name__ == "__main__":
+    raise SystemExit(main())

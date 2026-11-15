@@ -18,16 +18,17 @@ cd ozvuchka-videlenogo-teksta
 
 ## Запуск и остановка
 
-Главная команда — `speak-selection`:
+Команды теперь разделены по назначению:
 
 ```bash
-speak-selection          # то же, что toggle: запустить или остановить
-speak-selection start    # начать; если уже работает — оставить как есть
-speak-selection stop     # остановить текущую озвучку
-speak-selection status   # показать состояние
+speak "текст для озвучивания"  # запустить озвучивание указанного текста
+cat article.txt | speak       # принять текст из stdin
+speak-selection               # озвучить выделение; повторное нажатие останавливает
+stop-speech                    # остановить озвучивание
+speak-status                   # проверить состояние
 ```
 
-Горячая клавиша вызывает `speak-selection toggle`. Второе нажатие останавливает текущую озвучку. `start` читает текущее выделение; проверь, что оно не пустое.
+Горячая клавиша вызывает `speak-selection`. `speak` — явный запуск для переданного текста, `stop-speech` — отдельная остановка, а `speak-selection` сохраняет toggle-поведение для горячей клавиши.
 
 ## Что показывается в панели
 
@@ -39,11 +40,17 @@ speak-selection status   # показать состояние
 
 - `EDGE_TTS_VOICE` — голос, например `ru-RU-SvetlanaNeural`
 - `EDGE_TTS_RATE`, `EDGE_TTS_VOLUME`, `EDGE_TTS_PITCH` — темп и параметры синтеза Edge TTS
+- `EDGE_TTS_CONNECT_TIMEOUT`, `EDGE_TTS_RECEIVE_TIMEOUT` — сетевые таймауты API
 - `MPV_PLAYBACK_SPEED`, `MPV_PLAYBACK_VOLUME` — скорость и громкость проигрывателя
 - `CUE_VOLUME`, `TICK_VOLUME_DB` — громкость сигналов запуска/отмены и тихого тика
+- `API_MAX_ATTEMPTS`, `API_RETRY_BASE_SECONDS`, `API_RETRY_MAX_SECONDS` — ограниченные повторы API без аудио с экспоненциальной паузой
 - `START_SOUND`, `CANCEL_SOUND`, `TICK_SOUND` — файлы звуков; по умолчанию берутся из `~/.local/share/selected-text-speech/sounds/`
 
 Системные сигналы запуска и отмены скопированы в репозиторий, а их источники и лицензии указаны в [`SOURCES.md`](linux-gnome/share/sounds/SOURCES.md). Повторный запуск установщика не перезаписывает существующий пользовательский `config.env`.
+
+### Если Edge TTS временно не прислал аудио
+
+В журнале клиента зафиксирован `NoAudioReceived` до первого аудиофрагмента; в том же запуске повторная попытка затем получила аудио. Такая ошибка наблюдается и у других пользователей `edge-tts 7.3.1`: сервер иногда заканчивает WebSocket-запрос без аудио. Поэтому Python-клиент повторяет только неуспешные попытки до первого аудиофрагмента, с ограниченной экспоненциальной паузой. Если звук уже пошёл, повторного проигрывания не будет. Журнал по пути `$XDG_RUNTIME_DIR/macbook-tts-$UID/tts.log` содержит номер попытки, длительность и тип ошибки, но не сохраняет переданный текст. [Upstream issue](https://github.com/rany2/edge-tts/issues/512).
 
 ## Требования
 
@@ -53,9 +60,11 @@ speak-selection status   # показать состояние
 
 Установщик ставит `mpv`, `pipx`, GTK/Ayatana bindings, `wl-clipboard` и `xclip`, системные звуки и уведомления. На Wayland используется `wl-paste`, на X11 — `xclip` (с `xsel` тоже совместимо).
 
-## Файлы
+## Устройство проекта
 
-- `linux-gnome/bin/speak-selection` — переключатель/контроллер запуска и остановки
-- `linux-gnome/bin/edge-tts-stream.py` — запрос к Edge TTS и потоковая передача аудио
-- `linux-gnome/bin/tts-panel-indicator.py` — таймер и индикатор панели GNOME
-- `install.sh` — установка зависимостей, файлов и сочетания клавиш
+- `linux-gnome/bin/speak` — Python CLI, принимает текст аргументом или из stdin
+- `linux-gnome/bin/stop-speech` — отдельная команда остановки
+- `linux-gnome/bin/speak-selection` — интеграция выделения с GNOME и toggle по горячей клавише
+- `linux-gnome/src/selected_text_speech/` — Python-модули конфигурации, API-потока, аудиоплеера, таймера и панели
+- `config.env` — корневой шаблон конфигурации
+- `install.sh` — зависимости, установка пакета и сочетания клавиш

@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 user_bin="$HOME/.local/bin"
+user_lib="$HOME/.local/lib"
 user_data="$HOME/.local/share"
 user_config="${XDG_CONFIG_HOME:-$HOME/.config}/selected-text-speech"
 
@@ -37,10 +38,13 @@ sudo apt-get install -y --no-remove --no-upgrade \
   xclip \
   yaru-theme-sound
 
-mkdir -p "$user_bin" "$user_data/icons" "$user_data/selected-text-speech/sounds" "$user_config"
-install -m 0755 "$repo_dir/linux-gnome/bin/speak-selection" "$user_bin/speak-selection"
-install -m 0755 "$repo_dir/linux-gnome/bin/edge-tts-stream.py" "$user_bin/edge-tts-stream.py"
-install -m 0755 "$repo_dir/linux-gnome/bin/tts-panel-indicator.py" "$user_bin/tts-panel-indicator.py"
+mkdir -p "$user_bin" "$user_lib/selected_text_speech" "$user_data/icons" "$user_data/selected-text-speech/sounds" "$user_config"
+for command_file in _bootstrap.py speak speak-selection speak-status stop-speech; do
+  install -m 0755 "$repo_dir/linux-gnome/bin/$command_file" "$user_bin/$command_file"
+done
+for module_file in "$repo_dir"/linux-gnome/src/selected_text_speech/*.py; do
+  install -m 0644 "$module_file" "$user_lib/selected_text_speech/$(basename "$module_file")"
+done
 install -m 0644 "$repo_dir/linux-gnome/share/icons/openclaw-tts-waveform.svg" "$user_data/icons/openclaw-tts-waveform.svg"
 install -m 0644 "$repo_dir/linux-gnome/share/icons/openclaw-tts-waiting.svg" "$user_data/icons/openclaw-tts-waiting.svg"
 install -m 0644 "$repo_dir/linux-gnome/share/sounds/openclaw-soft-tick.wav" "$user_data/selected-text-speech/sounds/openclaw-soft-tick.wav"
@@ -76,7 +80,7 @@ PY
 gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "$new_key_list"
 key_schema="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$key_path"
 gsettings set "$key_schema" name "'Selected text speech'"
-gsettings set "$key_schema" command "'$user_bin/speak-selection toggle'"
+gsettings set "$key_schema" command "'$user_bin/speak-selection'"
 gsettings set "$key_schema" binding "'<Super>Escape'"
 
 indicator_extension="ubuntu-appindicators@ubuntu.com"
@@ -90,5 +94,5 @@ fi
 
 echo
 echo "Установка завершена. Горячая клавиша: Super (⌘ на клавиатуре Mac) + Escape."
-echo "Команды: speak-selection start | stop | toggle | status"
+echo "Команды: speak 'текст' | speak-selection | stop-speech | speak-status"
 echo "Проверь, что ~/.local/bin находится в PATH; после установки можно перелогиниться, если сочетание не сработало сразу."

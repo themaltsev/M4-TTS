@@ -1,0 +1,7 @@
+#!/usr/bin/env python3
+from _bootstrap import add_package_paths
+
+add_package_paths(__file__)
+from selected_text_speech.cli import stop_main
+
+raise SystemExit(stop_main())
