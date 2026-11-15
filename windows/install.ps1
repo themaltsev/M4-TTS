@@ -6,11 +6,24 @@ $bin = Join-Path $app 'bin'
 $venv = Join-Path $app 'venv'
 
 New-Item -ItemType Directory -Force -Path $bin, $configDir | Out-Null
+$state = Join-Path $app 'state'
+$oldTrayPidFile = Join-Path $state 'tray.pid'
+if (Test-Path $oldTrayPidFile) {
+    $oldTrayPid = 0
+    [void][int]::TryParse((Get-Content $oldTrayPidFile -Raw), [ref]$oldTrayPid)
+    if ($oldTrayPid -gt 0) {
+        $oldTray = Get-CimInstance Win32_Process -Filter "ProcessId = $oldTrayPid" -ErrorAction SilentlyContinue
+        if ($oldTray -and $oldTray.CommandLine -like "*selected-text-speech*speech.py*") {
+            Stop-Process -Id $oldTrayPid -Force -ErrorAction SilentlyContinue
+            Wait-Process -Id $oldTrayPid -Timeout 5 -ErrorAction SilentlyContinue
+        }
+    }
+}
 if (-not (Test-Path (Join-Path $venv 'Scripts\python.exe'))) {
     py -3 -m venv $venv
 }
 $python = Join-Path $venv 'Scripts\python.exe'
-& $python -m pip install edge-tts pygame keyboard
+& $python -m pip install edge-tts pygame keyboard pystray pillow
 Copy-Item (Join-Path $repo 'speech.py') (Join-Path $app 'speech.py') -Force
 if (-not (Test-Path (Join-Path $configDir 'config.env'))) {
     @'
@@ -22,7 +35,12 @@ MPV_PLAYBACK_VOLUME=100
 API_MAX_ATTEMPTS=3
 API_RETRY_BASE_SECONDS=1.5
 API_RETRY_MAX_SECONDS=8
+HOTKEY=ctrl+alt+s
 '@ | Set-Content -Encoding utf8 (Join-Path $configDir 'config.env')
+}
+$configFile = Join-Path $configDir 'config.env'
+if (-not (Select-String -Path $configFile -Pattern '^\s*HOTKEY\s*=' -Quiet)) {
+    Add-Content -Encoding utf8 $configFile 'HOTKEY=ctrl+alt+s'
 }
 
 $commandsToCreate = @{
@@ -30,6 +48,7 @@ $commandsToCreate = @{
     'speak-selection.cmd' = 'selection'
     'stop-speech.cmd' = 'stop'
     'speak-status.cmd' = 'status'
+    'selected-text-speech-tray.cmd' = 'tray'
 }
 foreach ($entry in $commandsToCreate.GetEnumerator()) {
     $target = Join-Path $bin $entry.Key
@@ -41,10 +60,14 @@ if (($userPath -split ';') -notcontains $bin) {
 }
 
 $startup = [Environment]::GetFolderPath('Startup')
-$hotkey = Join-Path $startup 'Selected Text Speech.cmd'
-"@echo off`r`nstart `"Selected Text Speech hotkey`" /min `"$python`" `"$app\speech.py`" hotkey`r`n" | Set-Content -Encoding ascii $hotkey
+$startupEntry = Join-Path $startup 'Selected Text Speech.cmd'
+$pythonw = Join-Path $venv 'Scripts\pythonw.exe'
+"@echo off`r`nstart `"Selected Text Speech tray`" `"$pythonw`" `"$app\speech.py`" tray`r`n" | Set-Content -Encoding ascii $startupEntry
+$trayArgs = '"{0}" tray' -f (Join-Path $app 'speech.py')
+Start-Process -FilePath $pythonw -ArgumentList $trayArgs -WindowStyle Hidden
 
 Write-Host "Установлено в $app"
 Write-Host "Команды: $bin\speak.cmd TEXT, speak-selection.cmd, stop-speech.cmd, speak-status.cmd"
-Write-Host 'Хоткей Ctrl+Alt+S активируется после входа в Windows; Ctrl+Alt+Q завершает его.'
-Write-Host 'Чтобы использовать собственный хоткей, назначь speak-selection.cmd в настройках ярлыка.'
+Write-Host 'В трее появится таймер, а при воспроизведении — значок эквалайзера.'
+Write-Host "Хоткей настраивается через HOTKEY в $configDir\config.env; перезапусти значок после изменения."
+Write-Host 'Удаление: запусти windows\uninstall.ps1; ключ -KeepConfig сохранит настройки.'

@@ -14,6 +14,9 @@ ROOT = Path(os.environ.get("LOCALAPPDATA", Path.home())) / APP
 STATE = ROOT / "state"
 CONFIG = Path(os.environ.get("APPDATA", Path.home())) / APP / "config.env"
 PID = STATE / "worker.pid"
+TRAY_PID = STATE / "tray.pid"
+STARTED = STATE / "started-at"
+PLAYING = STATE / "playing"
 LOG = STATE / "tts.log"
 
 
@@ -24,10 +27,11 @@ def settings() -> dict[str, str]:
         "MPV_PLAYBACK_SPEED": "1.35", "MPV_PLAYBACK_VOLUME": "100",
         "API_MAX_ATTEMPTS": "3", "API_RETRY_BASE_SECONDS": "1.5",
         "API_RETRY_MAX_SECONDS": "8", "MPV_PATH": "mpv",
+        "HOTKEY": "ctrl+alt+s",
     }
     try:
         for line in CONFIG.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
+            line = line.strip().lstrip("\ufeff")
             if line and not line.startswith("#") and "=" in line:
                 key, value = line.split("=", 1)
                 values[key.strip()] = value.strip().strip("\"'")
@@ -47,6 +51,17 @@ def active_pid() -> int | None:
         return None
 
 
+def stop_speech() -> bool:
+    pid = active_pid()
+    if pid is None:
+        return False
+    subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True)
+    PID.unlink(missing_ok=True)
+    PLAYING.unlink(missing_ok=True)
+    STARTED.unlink(missing_ok=True)
+    return True
+
+
 def start(text: str) -> int:
     text = text.strip()
     if not text:
@@ -60,6 +75,8 @@ def start(text: str) -> int:
             raise RuntimeError("Озвучивание уже запущено; используй stop-speech")
         with PID.open("x", encoding="ascii") as reservation:
             reservation.write(str(os.getpid()))
+    STARTED.write_text(str(time.time()), encoding="ascii")
+    PLAYING.unlink(missing_ok=True)
     try:
         with LOG.open("a", encoding="utf-8") as log:
             proc = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "--worker"],
@@ -98,6 +115,7 @@ async def worker(text: str) -> int:
                 pygame.mixer.init()
                 pygame.mixer.music.load(str(audio_path))
                 pygame.mixer.music.set_volume(max(0, min(100, int(cfg["MPV_PLAYBACK_VOLUME"]))) / 100)
+                PLAYING.write_text(str(time.time()), encoding="ascii")
                 pygame.mixer.music.play()
                 while pygame.mixer.music.get_busy():
                     await asyncio.sleep(0.15)
@@ -105,6 +123,7 @@ async def worker(text: str) -> int:
                 pygame.mixer.quit(); audio_path.unlink(missing_ok=True)
             return 0
         except Exception as exc:
+            PLAYING.unlink(missing_ok=True)
             with LOG.open("a", encoding="utf-8") as log:
                 log.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')} ATTEMPT {attempt} {type(exc).__name__}: {exc}\n")
             if attempt >= max_attempts:
@@ -136,9 +155,112 @@ def selection() -> int:
 
 def hotkey() -> None:
     import keyboard
-    print("Горячая клавиша активна: Ctrl+Alt+S (выход: Ctrl+Alt+Q)")
-    keyboard.add_hotkey("ctrl+alt+s", selection)
-    keyboard.wait("ctrl+alt+q")
+    shortcut = settings()["HOTKEY"].strip()
+    if not shortcut:
+        raise ValueError("HOTKEY не может быть пустым")
+    print(f"Горячая клавиша активна: {shortcut}")
+    keyboard.add_hotkey(shortcut, selection)
+    keyboard.wait()
+
+
+def tray() -> None:
+    import keyboard
+    import pystray
+    from PIL import Image, ImageDraw, ImageFont
+
+    STATE.mkdir(parents=True, exist_ok=True)
+    try:
+        with TRAY_PID.open("x", encoding="ascii") as tray_file:
+            tray_file.write(str(os.getpid()))
+    except FileExistsError:
+        try:
+            old_pid = int(TRAY_PID.read_text(encoding="ascii"))
+            os.kill(old_pid, 0)
+            raise RuntimeError("Значок утилиты уже запущен")
+        except (OSError, ValueError):
+            TRAY_PID.unlink(missing_ok=True)
+            TRAY_PID.write_text(str(os.getpid()), encoding="ascii")
+    cfg = settings()
+
+    def make_icon(mode: str, elapsed: int) -> Image.Image:
+        image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(image)
+        color = (255, 174, 65, 255) if mode == "waiting" else (65, 210, 145, 255)
+        if mode == "waiting":
+            draw.ellipse((10, 5, 54, 49), outline=color, width=5)
+            draw.line((32, 14, 32, 28, 41, 33), fill=color, width=4)
+        else:
+            for x, height in zip((14, 24, 34, 44, 54), (14, 28, 20, 34, 17)):
+                draw.rounded_rectangle((x - 3, 40 - height, x + 3, 40), radius=2, fill=color)
+        try:
+            font = ImageFont.truetype("arial.ttf", 28)
+        except OSError:
+            font = ImageFont.load_default()
+        # The shell downsamples tray icons to 16x16; use large digits here and
+        # expose the full elapsed time in the tooltip.
+        label = f"{elapsed % 100:02d}"
+        draw.rounded_rectangle((7, 39, 57, 63), radius=4, fill=(30, 34, 42, 245))
+        box = draw.textbbox((0, 0), label, font=font)
+        text_x = (64 - (box[2] - box[0])) / 2 - box[0]
+        text_y = (39 + 64 - (box[3] - box[1])) / 2 - box[1]
+        draw.text((text_x, text_y), label, font=font, fill=(245, 245, 245, 255))
+        return image
+
+    def stop_item(_icon: object, _item: object) -> None:
+        stop_speech()
+
+    def quit_item(icon: object, _item: object) -> None:
+        keyboard.unhook_all_hotkeys()
+        icon.stop()
+
+    icon = pystray.Icon(
+        "selected-text-speech", make_icon("waiting", 0), "Озвучивание: готово",
+        menu=pystray.Menu(
+            pystray.MenuItem("Остановить озвучивание", stop_item),
+            pystray.MenuItem(f"Хоткей: {cfg['HOTKEY']}", None, enabled=False),
+            pystray.MenuItem("Выход", quit_item),
+        ),
+    )
+
+    def on_hotkey() -> None:
+        try:
+            selection()
+        except Exception as exc:
+            with LOG.open("a", encoding="utf-8") as log:
+                log.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')} HOTKEY_ERROR {type(exc).__name__}: {exc}\n")
+
+    keyboard.add_hotkey(cfg["HOTKEY"], on_hotkey)
+
+    def update_status() -> None:
+        while True:
+            if not icon.visible:
+                time.sleep(0.2)
+                continue
+            pid = active_pid()
+            if pid:
+                try:
+                    started = float(STARTED.read_text(encoding="ascii"))
+                except (OSError, ValueError):
+                    started = time.time()
+                elapsed = max(0, int(time.time() - started))
+                playing = PLAYING.exists()
+                icon.icon = make_icon("playing" if playing else "waiting", elapsed)
+                icon.title = f"{'Идёт озвучивание' if playing else 'Ожидание TTS'} • {elapsed} с"
+            else:
+                icon.icon = make_icon("waiting", 0)
+                icon.title = "Озвучивание текста • готово"
+            time.sleep(1)
+
+    import threading
+    threading.Thread(target=update_status, daemon=True).start()
+    try:
+        icon.run()
+    finally:
+        keyboard.unhook_all_hotkeys()
+        try:
+            if TRAY_PID.read_text(encoding="ascii").strip() == str(os.getpid()): TRAY_PID.unlink()
+        except (OSError, ValueError):
+            pass
 
 
 def main() -> int:
@@ -151,16 +273,18 @@ def main() -> int:
                 if PID.read_text(encoding="ascii").strip() == str(os.getpid()): PID.unlink()
             except (OSError, ValueError):
                 pass
+            PLAYING.unlink(missing_ok=True)
+            STARTED.unlink(missing_ok=True)
     if args == ["stop"]:
-        pid = active_pid()
-        if pid is None: print("Озвучивание не запущено"); return 0
-        subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True)
-        PID.unlink(missing_ok=True); print("Озвучивание остановлено"); return 0
+        stopped = stop_speech()
+        print("Озвучивание остановлено" if stopped else "Озвучивание не запущено")
+        return 0
     if args == ["status"]:
         pid = active_pid(); print(f"Озвучивание запущено (PID {pid})" if pid else "Озвучивание не запущено")
         return 0 if pid else 1
     if args == ["selection"]: return selection()
     if args == ["hotkey"]: hotkey(); return 0
+    if args == ["tray"]: tray(); return 0
     if args and args[0] == "speak": args = args[1:]
     if not args: print("Использование: speak TEXT | stop | status | selection | hotkey"); return 2
     return 0 if start(" ".join(args)) else 1
