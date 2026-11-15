@@ -87,7 +87,12 @@ target.write_bytes(plistlib.dumps(data))
 PY
 
 launchctl bootout "gui/$(id -u)" "$launch_agent" >/dev/null 2>&1 || true
-read -r -p "Добавить приложение в автозапуск macOS при входе? [y/n] " autostart_answer
+autostart_answer=n
+if [[ -r /dev/tty ]]; then
+  read -r -p "Добавить приложение в автозапуск macOS при входе? [y/n] " autostart_answer </dev/tty || autostart_answer=n
+else
+  echo "Терминал недоступен: автозапуск не включён."
+fi
 if [[ "$autostart_answer" =~ ^[YyДд]$ ]]; then
   launchctl bootstrap "gui/$(id -u)" "$launch_agent"
   launchctl kickstart -k "gui/$(id -u)/$label"

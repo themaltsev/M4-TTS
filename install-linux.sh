@@ -126,7 +126,12 @@ else
 fi
 
 echo
-read -r -p "Добавить хоткей Super+Escape в GNOME (будет доступен после входа в систему)? [y/n] " autostart_answer
+autostart_answer=n
+if [[ -r /dev/tty ]]; then
+  read -r -p "Добавить хоткей Super+Escape в GNOME (будет доступен после входа в систему)? [y/n] " autostart_answer </dev/tty || autostart_answer=n
+else
+  echo "Терминал недоступен: хоткей не добавлен в автозапуск."
+fi
 if [[ "$autostart_answer" =~ ^[YyДд]$ ]]; then
   echo "Хоткей включён."
 else
