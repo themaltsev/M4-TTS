@@ -84,7 +84,7 @@ worker() {
   local stream_ok=0
   local stream_attempt
   for stream_attempt in 1 2 3; do
-    if TTS_TICK_PID="$tick_pid" "$HOME/.local/share/pipx/venvs/edge-tts/bin/python" \
+    if TTS_TICK_PID="$tick_pid" TTS_INDICATOR_PID="$indicator_pid" "$HOME/.local/share/pipx/venvs/edge-tts/bin/python" \
         "$HOME/.local/bin/edge-tts-stream.py" "$text" |
         mpv --no-video --speed=1.35 --really-quiet --cache=no -; then
       stream_ok=1

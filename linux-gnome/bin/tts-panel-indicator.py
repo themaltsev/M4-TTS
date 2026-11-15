@@ -10,7 +10,8 @@ from gi.repository import GLib, Gtk, AyatanaAppIndicator3
 
 started_at = float(os.environ.get("TTS_STARTED_MONOTONIC", time.monotonic()))
 
-icon = "/home/user/.local/share/icons/openclaw-tts-waveform.svg"
+icon = "/home/user/.local/share/icons/openclaw-tts-waiting.svg"
+waveform_icon = "/home/user/.local/share/icons/openclaw-tts-waveform.svg"
 indicator = AyatanaAppIndicator3.Indicator.new(
     "openclaw-tts", icon,
     AyatanaAppIndicator3.IndicatorCategory.APPLICATION_STATUS,
@@ -27,10 +28,13 @@ indicator.set_status(AyatanaAppIndicator3.IndicatorStatus.ACTIVE)
 
 
 last_seconds = -1
+playback_started = False
 
 
 def update_elapsed():
     global last_seconds
+    if playback_started:
+        return GLib.SOURCE_REMOVE
     seconds = max(0, int(time.monotonic() - started_at))
     if seconds == last_seconds:
         return GLib.SOURCE_CONTINUE
@@ -41,6 +45,25 @@ def update_elapsed():
     indicator.set_title(description)
     status.set_label(description)
     return GLib.SOURCE_CONTINUE
+
+
+def switch_to_playing():
+    global playback_started
+    if playback_started:
+        return GLib.SOURCE_REMOVE
+    playback_started = True
+    indicator.set_icon_full(waveform_icon, "Идёт озвучивание текста")
+    indicator.set_label("", "")
+    indicator.set_title("Идёт озвучивание текста")
+    status.set_label("Идёт озвучивание текста")
+    return GLib.SOURCE_REMOVE
+
+
+def on_playback_started(*_):
+    GLib.idle_add(switch_to_playing)
+
+
+signal.signal(signal.SIGUSR1, on_playback_started)
 
 
 update_elapsed()

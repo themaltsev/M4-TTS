@@ -10,6 +10,7 @@ import edge_tts
 async def main():
     text = sys.argv[1]
     tick_pid = int(os.environ.get("TTS_TICK_PID", "0"))
+    indicator_pid = int(os.environ.get("TTS_INDICATOR_PID", "0"))
     ticks_stopped = False
     communicate = edge_tts.Communicate(text, voice="ru-RU-SvetlanaNeural")
     async for chunk in communicate.stream():
@@ -19,6 +20,11 @@ async def main():
         sys.stdout.buffer.flush()
         if not ticks_stopped:
             print("TTS_FIRST_AUDIO", file=sys.stderr, flush=True)
+            if indicator_pid > 0:
+                try:
+                    os.kill(indicator_pid, signal.SIGUSR1)
+                except ProcessLookupError:
+                    pass
             if tick_pid > 0:
                 try:
                     os.kill(tick_pid, signal.SIGTERM)
