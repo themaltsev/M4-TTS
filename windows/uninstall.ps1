@@ -31,11 +31,17 @@ $filteredPath = ($userPath -split ';' | Where-Object { $_ -and $_.TrimEnd('\') -
 [Environment]::SetEnvironmentVariable('Path', $filteredPath, 'User')
 
 if (-not $KeepConfig) {
-    Remove-Item $configDir -Recurse -Force -ErrorAction SilentlyContinue
+    if (Test-Path $configDir) {
+        Add-Type -AssemblyName Microsoft.VisualBasic
+        [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($configDir, 'OnlyErrorDialogs', 'SendToRecycleBin')
+    }
 }
-Remove-Item $app -Recurse -Force -ErrorAction SilentlyContinue
+if (Test-Path $app) {
+    Add-Type -AssemblyName Microsoft.VisualBasic
+    [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($app, 'OnlyErrorDialogs', 'SendToRecycleBin')
+}
 if ($KeepConfig) {
-    Write-Host "Утилита удалена; конфигурация сохранена: $configDir"
+    Write-Host "Утилита отправлена в Корзину; конфигурация сохранена: $configDir"
 } else {
-    Write-Host 'Утилита и её конфигурация удалены.'
+    Write-Host 'Утилита и её конфигурация отправлены в Корзину.'
 }
