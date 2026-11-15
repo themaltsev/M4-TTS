@@ -4,6 +4,7 @@ set -euo pipefail
 export PATH="$HOME/.local/bin:/usr/bin:/bin:$PATH"
 
 state="${XDG_RUNTIME_DIR:-/tmp}/macbook-tts-$UID"
+started_at_monotonic="$(awk '{print $1}' /proc/uptime)"
 mkdir -p "$state"
 pidfile="$state/worker.pid"
 tick_pid=""
@@ -19,7 +20,8 @@ stop_ticking() {
 }
 
 start_indicator() {
-  /usr/bin/python3 "$HOME/.local/bin/tts-panel-indicator.py" > /dev/null 2> "$state/indicator.log" &
+  TTS_STARTED_MONOTONIC="$started_at_monotonic" \
+    /usr/bin/python3 "$HOME/.local/bin/tts-panel-indicator.py" > /dev/null 2> "$state/indicator.log" &
   indicator_pid=$!
 }
 
