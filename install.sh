@@ -61,10 +61,34 @@ else
   pipx install edge-tts
 fi
 
-# Preserve other GNOME custom shortcuts while adding/updating our own binding.
-key_path="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/selected-text-speech/"
+# Reuse an existing binding to speak-selection; otherwise add our own without
+# disturbing the user's other GNOME shortcuts.
+custom_schema="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding"
 key_list="$(gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings)"
-new_key_list="$(python3 - "$key_list" "$key_path" <<'PY'
+key_candidates="$(python3 - "$key_list" <<'PY'
+import ast
+import sys
+
+raw = sys.argv[1]
+if raw.startswith("@as"):
+    raw = raw[3:].strip()
+for path in ast.literal_eval(raw):
+    print(path)
+PY
+)"
+key_path=""
+while IFS= read -r candidate; do
+  [[ -n "$candidate" ]] || continue
+  candidate_command="$(gsettings get "$custom_schema:$candidate" command 2>/dev/null | python3 -c 'import ast,sys; print(ast.literal_eval(sys.stdin.read()))' 2>/dev/null || true)"
+  if [[ "$candidate_command" == "$user_bin/speak-selection" || "$candidate_command" == "$user_bin/speak-selection toggle" ]]; then
+    key_path="$candidate"
+    break
+  fi
+done <<< "$key_candidates"
+
+if [[ -z "$key_path" ]]; then
+  key_path="/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/selected-text-speech/"
+  new_key_list="$(python3 - "$key_list" "$key_path" <<'PY'
 import ast
 import sys
 
@@ -77,8 +101,15 @@ if new_path not in paths:
 print("[" + ", ".join(repr(path) for path in paths) + "]")
 PY
 )"
-gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "$new_key_list"
-key_schema="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding:$key_path"
+  gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "$new_key_list"
+fi
+
+if [[ "$key_path" != /* ]]; then
+  echo "Не удалось определить путь GNOME-сочетания клавиш." >&2
+  exit 1
+fi
+
+key_schema="$custom_schema:$key_path"
 gsettings set "$key_schema" name "'Selected text speech'"
 gsettings set "$key_schema" command "'$user_bin/speak-selection'"
 gsettings set "$key_schema" binding "'<Super>Escape'"
