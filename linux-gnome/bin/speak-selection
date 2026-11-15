@@ -50,7 +50,9 @@ worker() {
   unset DESKTOP_STARTUP_ID GIO_LAUNCHED_DESKTOP_FILE GIO_LAUNCHED_DESKTOP_FILE_PID
 
   tick_pid=""
-  start_indicator
+  if [[ -z "$indicator_pid" ]]; then
+    start_indicator
+  fi
   # Start one quiet tick after each full second while the online voice is being prepared.
   (
     tick_player=""
@@ -110,6 +112,7 @@ worker() {
 
 if [[ "${1:-}" == "--worker" ]]; then
   worker_pidfile="$state/worker.pid"
+  indicator_pid="${TTS_INDICATOR_PID:-}"
   trap cleanup_worker EXIT
   trap 'exit 143' TERM
   trap 'exit 130' INT
@@ -125,7 +128,7 @@ fi
     if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
       kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
       rm -f -- "$pidfile"
-      canberra-gtk-play --file=/usr/share/sounds/freedesktop/stereo/dialog-information.oga --description="Озвучивание остановлено" --volume=0.0 >/dev/null 2>&1 || true
+      mpv --no-video --really-quiet /usr/share/sounds/freedesktop/stereo/dialog-information.oga >>"$state/cues.log" 2>&1 || true
       exit 0
     fi
     rm -f -- "$pidfile"
@@ -147,9 +150,11 @@ fi
     exit 0
   fi
 
-  canberra-gtk-play --file=/usr/share/sounds/Yaru/stereo/message-new-instant.oga --description="Озвучивание началось" --volume=0.0 >/dev/null 2>&1 || true
+  # Register the panel item before playing the cue or requesting audio.
+  start_indicator
+  mpv --no-video --really-quiet /usr/share/sounds/Yaru/stereo/message-new-instant.oga >>"$state/cues.log" 2>&1 || true
 
-  setsid "$0" --worker "$text" \
+  TTS_INDICATOR_PID="$indicator_pid" setsid "$0" --worker "$text" \
     9>&- >"$state/tts.log" 2>&1 </dev/null &
 
   echo "$!" > "$pidfile"
