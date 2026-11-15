@@ -15,7 +15,7 @@ if [[ -x "$app_dir/venv/bin/python" && -f "$app_dir/speech.py" ]]; then
   "$app_dir/venv/bin/python" "$app_dir/speech.py" stop >/dev/null 2>&1 || true
 fi
 mkdir -p "$trash_dir"
-for command_name in speak speak-selection stop-speech speak-status; do
+for command_name in speak speak-selection stop-speech speak-status selected-text-speech-tray; do
   if [[ -e "$bin_dir/$command_name" ]]; then mv "$bin_dir/$command_name" "$trash_dir/$command_name"; fi
 done
 if [[ -e "$launch_agent" ]]; then mv "$launch_agent" "$trash_dir/$(basename "$launch_agent")"; fi

@@ -78,8 +78,10 @@ def start(text: str) -> int:
     STARTED.write_text(str(time.time()), encoding="ascii")
     PLAYING.unlink(missing_ok=True)
     try:
+        worker_command = ([sys.executable, "--worker"] if getattr(sys, "frozen", False)
+                          else [sys.executable, str(Path(__file__).resolve()), "--worker"])
         with LOG.open("a", encoding="utf-8") as log:
-            proc = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "--worker"],
+            proc = subprocess.Popen(worker_command,
                                     stdin=subprocess.PIPE, stdout=log, stderr=subprocess.STDOUT,
                                     creationflags=subprocess.CREATE_NO_WINDOW)
         PID.write_text(str(proc.pid), encoding="ascii")

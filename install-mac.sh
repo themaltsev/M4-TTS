@@ -10,7 +10,7 @@ if ! command -v brew >/dev/null 2>&1; then
   exit 1
 fi
 
-repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 app_dir="$HOME/Library/Application Support/selected-text-speech"
 config_dir="$HOME/Library/Application Support/selected-text-speech"
 venv="$app_dir/venv"
@@ -50,12 +50,13 @@ elif ! grep -Eq '^[[:space:]]*HOTKEY[[:space:]]*=' "$config_dir/config.env"; the
   printf '\nHOTKEY=cmd+esc\n' >> "$config_dir/config.env"
 fi
 
-for command_name in speak speak-selection stop-speech speak-status; do
+for command_name in speak speak-selection stop-speech speak-status selected-text-speech-tray; do
   case "$command_name" in
     speak) mode=speak ;;
     speak-selection) mode=selection ;;
     stop-speech) mode=stop ;;
     speak-status) mode=status ;;
+    selected-text-speech-tray) mode=tray ;;
   esac
   cat > "$bin_dir/$command_name" <<EOF
 #!/usr/bin/env bash
@@ -86,8 +87,15 @@ target.write_bytes(plistlib.dumps(data))
 PY
 
 launchctl bootout "gui/$(id -u)" "$launch_agent" >/dev/null 2>&1 || true
-launchctl bootstrap "gui/$(id -u)" "$launch_agent"
-launchctl kickstart -k "gui/$(id -u)/$label"
+read -r -p "Добавить приложение в автозапуск macOS при входе? [y/n] " autostart_answer
+if [[ "$autostart_answer" =~ ^[YyДд]$ ]]; then
+  launchctl bootstrap "gui/$(id -u)" "$launch_agent"
+  launchctl kickstart -k "gui/$(id -u)/$label"
+  echo "Автозапуск включён."
+else
+  rm -f "$launch_agent"
+  echo "Автозапуск не включён. Чтобы запустить значок вручную: selected-text-speech-tray"
+fi
 
 echo "Установка завершена. Хоткей: смотри $config_dir/config.env (по умолчанию cmd+esc)."
 echo "Команды установлены в $bin_dir; добавь этот каталог в PATH, если он ещё не добавлен."
