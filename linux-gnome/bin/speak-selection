@@ -125,6 +125,15 @@ if [[ "${1:-}" == "--worker" ]]; then
   exit 0
 fi
 
+mode="${1:-toggle}"
+case "$mode" in
+  toggle|start|stop|status) ;;
+  *)
+    printf 'Usage: %s [start|stop|toggle|status]\n' "${0##*/}" >&2
+    exit 2
+    ;;
+esac
+
 cancel_active_worker() {
   if [[ -s "$pidfile" ]]; then
     local pid
@@ -140,9 +149,23 @@ cancel_active_worker() {
   return 1
 }
 
-# Check cancellation before waiting for the launch lock. A long-lived indicator must
-# never keep the second hotkey press blocked on the launcher's flock descriptor.
-if cancel_active_worker; then
+# The hotkey uses toggle; explicit start is idempotent and stop never starts a new run.
+if [[ "$mode" == "status" ]]; then
+  if [[ -s "$pidfile" ]]; then
+    pid="$(cat "$pidfile" 2>/dev/null || true)"
+    if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+      echo "Озвучивание запущено (PID $pid)"
+      exit 0
+    fi
+  fi
+  echo "Озвучивание не запущено"
+  exit 1
+fi
+if [[ "$mode" == "stop" ]]; then
+  if cancel_active_worker; then exit 0; fi
+  exit 0
+fi
+if [[ "$mode" == "toggle" ]] && cancel_active_worker; then
   exit 0
 fi
 
@@ -152,6 +175,7 @@ fi
   if [[ -s "$pidfile" ]]; then
     pid="$(cat "$pidfile")"
     if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+      if [[ "$mode" == "start" ]]; then exit 0; fi
       kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
       rm -f -- "$pidfile"
       mpv --no-video --really-quiet /usr/share/sounds/freedesktop/stereo/dialog-information.oga >>"$state/cues.log" 2>&1 || true

@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import os
+from pathlib import Path
 import signal
 import time
 import gi
@@ -10,8 +11,9 @@ from gi.repository import GLib, Gtk, AyatanaAppIndicator3
 
 started_at = float(os.environ.get("TTS_STARTED_MONOTONIC", time.monotonic()))
 
-icon = "/home/user/.local/share/icons/openclaw-tts-waiting.svg"
-waveform_icon = "/home/user/.local/share/icons/openclaw-tts-waveform.svg"
+icons_dir = Path.home() / ".local/share/icons"
+icon = str(icons_dir / "openclaw-tts-waiting.svg")
+waveform_icon = str(icons_dir / "openclaw-tts-waveform.svg")
 indicator = AyatanaAppIndicator3.Indicator.new(
     "openclaw-tts", icon,
     AyatanaAppIndicator3.IndicatorCategory.APPLICATION_STATUS,
