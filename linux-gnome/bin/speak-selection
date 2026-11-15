@@ -3,6 +3,30 @@ set -euo pipefail
 
 export PATH="$HOME/.local/bin:/usr/bin:/bin:$PATH"
 
+config_file="${XDG_CONFIG_HOME:-$HOME/.config}/selected-text-speech/config.env"
+if [[ -f "$config_file" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$config_file"
+  set +a
+fi
+EDGE_TTS_VOICE="${EDGE_TTS_VOICE:-ru-RU-SvetlanaNeural}"
+EDGE_TTS_RATE="${EDGE_TTS_RATE:-+0%}"
+EDGE_TTS_VOLUME="${EDGE_TTS_VOLUME:-+0%}"
+EDGE_TTS_PITCH="${EDGE_TTS_PITCH:-+0Hz}"
+MPV_PLAYBACK_SPEED="${MPV_PLAYBACK_SPEED:-1.35}"
+MPV_PLAYBACK_VOLUME="${MPV_PLAYBACK_VOLUME:-100}"
+CUE_VOLUME="${CUE_VOLUME:-100}"
+TICK_VOLUME_DB="${TICK_VOLUME_DB:--12.0}"
+START_SOUND="${START_SOUND:-speech-start.oga}"
+CANCEL_SOUND="${CANCEL_SOUND:-speech-cancel.oga}"
+TICK_SOUND="${TICK_SOUND:-openclaw-soft-tick.wav}"
+sound_dir="$HOME/.local/share/selected-text-speech/sounds"
+
+resolve_sound() {
+  if [[ "$1" == /* ]]; then printf '%s\n' "$1"; else printf '%s/%s\n' "$sound_dir" "$1"; fi
+}
+
 state="${XDG_RUNTIME_DIR:-/tmp}/macbook-tts-$UID"
 started_at_monotonic="$(awk '{print $1}' /proc/uptime)"
 mkdir -p "$state"
@@ -73,7 +97,7 @@ worker() {
       tick_sleep=$!
       wait "$tick_sleep" || break
       tick_sleep=""
-      canberra-gtk-play --file="$HOME/.local/share/sounds/openclaw-soft-tick.wav" --volume=-12.0 >/dev/null 2>&1 &
+      canberra-gtk-play --file="$(resolve_sound "$TICK_SOUND")" --volume="$TICK_VOLUME_DB" >/dev/null 2>&1 &
       tick_player=$!
       wait "$tick_player" || true
       tick_player=""
@@ -84,9 +108,12 @@ worker() {
   local stream_ok=0
   local stream_attempt
   for stream_attempt in 1 2 3; do
-    if TTS_TICK_PID="$tick_pid" TTS_INDICATOR_PID="$indicator_pid" "$HOME/.local/share/pipx/venvs/edge-tts/bin/python" \
+    if TTS_TICK_PID="$tick_pid" TTS_INDICATOR_PID="$indicator_pid" \
+        EDGE_TTS_VOICE="$EDGE_TTS_VOICE" EDGE_TTS_RATE="$EDGE_TTS_RATE" \
+        EDGE_TTS_VOLUME="$EDGE_TTS_VOLUME" EDGE_TTS_PITCH="$EDGE_TTS_PITCH" \
+        "$HOME/.local/share/pipx/venvs/edge-tts/bin/python" \
         "$HOME/.local/bin/edge-tts-stream.py" "$text" |
-        mpv --no-video --speed=1.35 --really-quiet --cache=no -; then
+        mpv --no-video --speed="$MPV_PLAYBACK_SPEED" --volume="$MPV_PLAYBACK_VOLUME" --really-quiet --cache=no -; then
       stream_ok=1
       break
     fi
@@ -141,7 +168,7 @@ cancel_active_worker() {
     if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
       kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
       rm -f -- "$pidfile"
-      mpv --no-video --really-quiet /usr/share/sounds/freedesktop/stereo/dialog-information.oga >>"$state/cues.log" 2>&1 || true
+      mpv --no-video --really-quiet --volume="$CUE_VOLUME" -- "$(resolve_sound "$CANCEL_SOUND")" >>"$state/cues.log" 2>&1 || true
       return 0
     fi
     rm -f -- "$pidfile"
@@ -178,7 +205,7 @@ fi
       if [[ "$mode" == "start" ]]; then exit 0; fi
       kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
       rm -f -- "$pidfile"
-      mpv --no-video --really-quiet /usr/share/sounds/freedesktop/stereo/dialog-information.oga >>"$state/cues.log" 2>&1 || true
+      mpv --no-video --really-quiet --volume="$CUE_VOLUME" -- "$(resolve_sound "$CANCEL_SOUND")" >>"$state/cues.log" 2>&1 || true
       exit 0
     fi
     rm -f -- "$pidfile"
@@ -202,7 +229,7 @@ fi
 
   # Register the panel item before playing the cue or requesting audio.
   start_indicator
-  mpv --no-video --really-quiet /usr/share/sounds/Yaru/stereo/message-new-instant.oga >>"$state/cues.log" 2>&1 || true
+  mpv --no-video --really-quiet --volume="$CUE_VOLUME" -- "$(resolve_sound "$START_SOUND")" >>"$state/cues.log" 2>&1 || true
 
   TTS_INDICATOR_PID="$indicator_pid" setsid "$0" --worker "$text" \
     9>&- >"$state/tts.log" 2>&1 </dev/null &

@@ -12,7 +12,13 @@ async def main():
     tick_pid = int(os.environ.get("TTS_TICK_PID", "0"))
     indicator_pid = int(os.environ.get("TTS_INDICATOR_PID", "0"))
     ticks_stopped = False
-    communicate = edge_tts.Communicate(text, voice="ru-RU-SvetlanaNeural")
+    communicate = edge_tts.Communicate(
+        text,
+        voice=os.environ.get("EDGE_TTS_VOICE", "ru-RU-SvetlanaNeural"),
+        rate=os.environ.get("EDGE_TTS_RATE", "+0%"),
+        volume=os.environ.get("EDGE_TTS_VOLUME", "+0%"),
+        pitch=os.environ.get("EDGE_TTS_PITCH", "+0Hz"),
+    )
     async for chunk in communicate.stream():
         if chunk["type"] != "audio":
             continue

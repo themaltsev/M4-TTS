@@ -4,6 +4,7 @@ set -euo pipefail
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 user_bin="$HOME/.local/bin"
 user_data="$HOME/.local/share"
+user_config="${XDG_CONFIG_HOME:-$HOME/.config}/selected-text-speech"
 
 if [[ "$(id -u)" -eq 0 ]]; then
   echo "Запусти ./install.sh от своего пользователя из графического сеанса, не через sudo." >&2
@@ -36,13 +37,18 @@ sudo apt-get install -y --no-remove --no-upgrade \
   xclip \
   yaru-theme-sound
 
-mkdir -p "$user_bin" "$user_data/icons" "$user_data/sounds"
+mkdir -p "$user_bin" "$user_data/icons" "$user_data/selected-text-speech/sounds" "$user_config"
 install -m 0755 "$repo_dir/linux-gnome/bin/speak-selection" "$user_bin/speak-selection"
 install -m 0755 "$repo_dir/linux-gnome/bin/edge-tts-stream.py" "$user_bin/edge-tts-stream.py"
 install -m 0755 "$repo_dir/linux-gnome/bin/tts-panel-indicator.py" "$user_bin/tts-panel-indicator.py"
 install -m 0644 "$repo_dir/linux-gnome/share/icons/openclaw-tts-waveform.svg" "$user_data/icons/openclaw-tts-waveform.svg"
 install -m 0644 "$repo_dir/linux-gnome/share/icons/openclaw-tts-waiting.svg" "$user_data/icons/openclaw-tts-waiting.svg"
-install -m 0644 "$repo_dir/linux-gnome/share/sounds/openclaw-soft-tick.wav" "$user_data/sounds/openclaw-soft-tick.wav"
+install -m 0644 "$repo_dir/linux-gnome/share/sounds/openclaw-soft-tick.wav" "$user_data/selected-text-speech/sounds/openclaw-soft-tick.wav"
+install -m 0644 "$repo_dir/linux-gnome/share/sounds/speech-start.oga" "$user_data/selected-text-speech/sounds/speech-start.oga"
+install -m 0644 "$repo_dir/linux-gnome/share/sounds/speech-cancel.oga" "$user_data/selected-text-speech/sounds/speech-cancel.oga"
+if [[ ! -e "$user_config/config.env" ]]; then
+  install -m 0644 "$repo_dir/config.env" "$user_config/config.env"
+fi
 
 edge_python="$user_data/pipx/venvs/edge-tts/bin/python"
 if [[ -x "$edge_python" ]]; then
