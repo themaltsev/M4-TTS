@@ -20,8 +20,11 @@ stop_ticking() {
 }
 
 start_indicator() {
-  TTS_STARTED_MONOTONIC="$started_at_monotonic" \
-    /usr/bin/python3 "$HOME/.local/bin/tts-panel-indicator.py" > /dev/null 2> "$state/indicator.log" &
+  (
+    exec 9>&-
+    export TTS_STARTED_MONOTONIC="$started_at_monotonic"
+    exec /usr/bin/python3 "$HOME/.local/bin/tts-panel-indicator.py"
+  ) > /dev/null 2> "$state/indicator.log" &
   indicator_pid=$!
 }
 
@@ -119,6 +122,27 @@ if [[ "${1:-}" == "--worker" ]]; then
   trap 'exit 143' TERM
   trap 'exit 130' INT
   worker "$2" || exit $?
+  exit 0
+fi
+
+cancel_active_worker() {
+  if [[ -s "$pidfile" ]]; then
+    local pid
+    pid="$(cat "$pidfile" 2>/dev/null || true)"
+    if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+      kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
+      rm -f -- "$pidfile"
+      mpv --no-video --really-quiet /usr/share/sounds/freedesktop/stereo/dialog-information.oga >>"$state/cues.log" 2>&1 || true
+      return 0
+    fi
+    rm -f -- "$pidfile"
+  fi
+  return 1
+}
+
+# Check cancellation before waiting for the launch lock. A long-lived indicator must
+# never keep the second hotkey press blocked on the launcher's flock descriptor.
+if cancel_active_worker; then
   exit 0
 fi
 
