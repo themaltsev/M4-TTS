@@ -82,7 +82,7 @@ begin
     begin
       if Pos('TTS_ENGINE=', Uppercase(String(ExistingConfig))) = 0 then
         SaveStringToFile(ConfigPath,
-          #13#10 + '# Выбор движка: TTS_ENGINE=piper (локально) или TTS_ENGINE=edge (интернет).'#13#10 +
+          ''#13#10 + '# Выбор движка: TTS_ENGINE=piper (локально) или TTS_ENGINE=edge (интернет).'#13#10 +
           '# Поменяй значение TTS_ENGINE и сохрани файл для переключения.'#13#10 +
           'TTS_ENGINE=piper'#13#10 + 'PIPER_MODEL=models\ru_RU-irina-medium.onnx'#13#10, True);
       if Pos('HOTKEY=', Uppercase(String(ExistingConfig))) = 0 then

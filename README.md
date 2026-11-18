@@ -55,12 +55,14 @@ cat article.txt | ./linux-gnome/bin/speak
 
 На Linux хоткей запускает приложение прямо из `linux-gnome/bin/speak-selection` в текущем checkout. Python-окружение, модель, настройки, журналы и временное состояние располагаются внутри checkout в игнорируемых Git каталогах.
 
+Чтобы отключить Linux-установку, запусти `./uninstall-linux.sh`. Скрипт удалит только хоткей этого checkout и спросит, перемещать ли `.venv`, `.runtime` и `models` в Корзину. Исходники, `config.local.env` и системные пакеты сохраняются.
+
 ## Структура проекта
 
 - `linux-gnome/` — команды, GTK/tray indicator, clipboard и потоковая выдача аудио в Linux.
 - `macos/speech.py` — menu-bar runtime, глобальный хоткей и Notification Center.
 - `windows/speech.py` — Windows tray runtime и системные уведомления.
-- `install-linux.sh`, `install-mac.sh`, `windows/installer.iss` — platform installers.
+- `install-linux.sh`, `install-mac.sh`, `uninstall-linux.sh`, `windows/installer.iss` — platform installers and cleanup.
 - `requirements-piper.txt`, `requirements-edge.txt` — фиксируемые зависимости движков.
 - `scripts/download_voice.py` — загрузка голоса с проверкой SHA-256.
 - `THIRD_PARTY.md` — лицензии Piper и модели голоса.
