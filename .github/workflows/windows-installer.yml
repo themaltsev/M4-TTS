@@ -77,8 +77,11 @@ jobs:
             throw "Missing uninstall shortcut: $uninstallShortcutPath"
           }
           $uninstallShortcut = $shell.CreateShortcut($uninstallShortcutPath)
-          if ($uninstallShortcut.TargetPath -ine $uninstaller) {
-            throw "Uninstall shortcut does not target the uninstaller: $($uninstallShortcut.TargetPath)"
+          if ($uninstallShortcut.TargetPath -notlike '*\cmd.exe') {
+            throw "Uninstall shortcut does not launch cmd.exe: $($uninstallShortcut.TargetPath)"
+          }
+          if ($uninstallShortcut.Arguments -notmatch 'uninstall-windows\.cmd') {
+            throw "Uninstall shortcut does not pass uninstall-windows.cmd: $($uninstallShortcut.Arguments)"
           }
 
           $wscript = Join-Path $env:WINDIR 'System32\wscript.exe'

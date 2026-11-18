@@ -37,6 +37,7 @@ Source: "uninstall-windows.cmd"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{userprograms}\Selected Text Speech"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\run-tray.vbs"" ""{app}\{#AppExe}"""; WorkingDir: "{app}"
+Name: "{userprograms}\Удалить Selected Text Speech"; Filename: "{cmd}"; Parameters: "/c ""{app}\uninstall-windows.cmd"""; WorkingDir: "{app}"
 
 [Run]
 Filename: "{sys}\wscript.exe"; Parameters: """{app}\run-tray.vbs"" ""{app}\{#AppExe}"""; Flags: skipifsilent nowait
@@ -55,7 +56,7 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  ConfigPath, DefaultConfig, StartupLink, ShortcutParameters, UninstallLink: String;
+  ConfigPath, DefaultConfig, StartupLink, ShortcutParameters: String;
   ExistingConfig: AnsiString;
 begin
   if CurStep = ssPostInstall then
@@ -89,11 +90,6 @@ begin
       if Pos('HOTKEY=', Uppercase(String(ExistingConfig))) = 0 then
         SaveStringToFile(ConfigPath, #13#10 + 'HOTKEY=ctrl+alt+s'#13#10, True);
     end;
-
-    UninstallLink := ExpandConstant('{userprograms}\Удалить Selected Text Speech.lnk');
-    CreateShellLink(UninstallLink, 'Удалить Selected Text Speech',
-      ExpandConstant('{app}\unins000.exe'), '', ExpandConstant('{app}'), '',
-      0, SW_SHOWNORMAL);
 
     if not WizardSilent then
     begin
