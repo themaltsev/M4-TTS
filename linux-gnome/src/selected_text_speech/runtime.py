@@ -9,8 +9,9 @@ from typing import Iterator
 
 
 def state_dir() -> Path:
-    runtime = Path(os.environ.get("XDG_RUNTIME_DIR", "/tmp"))
-    directory = runtime / f"macbook-tts-{os.getuid()}"
+    # Keep runtime state beside the project source; the directory is git-ignored.
+    root = Path(__file__).resolve().parents[3]
+    directory = root / ".runtime"
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     try:
         directory.chmod(0o700)
@@ -69,7 +70,7 @@ def package_environment() -> dict[str, str]:
     env = os.environ.copy()
     package_root = str(Path(__file__).resolve().parent.parent)
     env["PYTHONPATH"] = package_root + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
-    env["PATH"] = str(Path.home() / ".local/bin") + os.pathsep + env.get("PATH", "/usr/bin:/bin")
+    env["PATH"] = env.get("PATH", "/usr/bin:/bin")
     env["PYTHONUNBUFFERED"] = "1"
     for name in ("DESKTOP_STARTUP_ID", "GIO_LAUNCHED_DESKTOP_FILE", "GIO_LAUNCHED_DESKTOP_FILE_PID"):
         env.pop(name, None)

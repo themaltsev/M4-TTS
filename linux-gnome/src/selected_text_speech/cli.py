@@ -7,7 +7,7 @@ from . import controller
 
 
 def speak_main() -> int:
-    parser = argparse.ArgumentParser(prog="speak", description="Озвучить переданный текст через Edge TTS")
+    parser = argparse.ArgumentParser(prog="speak", description="Озвучить переданный текст локальным Piper")
     parser.add_argument("text", nargs="*", help="Текст; если аргументы не заданы, читает stdin")
     parser.add_argument("--stdin", action="store_true", help="явно читать текст из stdin")
     args = parser.parse_args()

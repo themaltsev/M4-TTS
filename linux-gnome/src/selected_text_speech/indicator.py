@@ -12,7 +12,7 @@ gi.require_version("AyatanaAppIndicator3", "0.1")
 from gi.repository import AyatanaAppIndicator3, GLib, Gtk
 
 
-icons_dir = Path.home() / ".local/share/icons"
+icons_dir = Path(__file__).resolve().parents[2] / "share/icons"
 waiting_icon = str(icons_dir / "openclaw-tts-waiting.svg")
 waveform_icon = str(icons_dir / "openclaw-tts-waveform.svg")
 started_at = float(os.environ.get("SELECTED_TEXT_STARTED_MONOTONIC", time.monotonic()))

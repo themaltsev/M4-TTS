@@ -64,6 +64,11 @@ def _run_stream(text: str, config: Config, tick: subprocess.Popen[bytes], indica
             "TTS_TICK_PID": str(tick.pid),
             "TTS_INDICATOR_PID": str(indicator.pid),
             "TTS_FIRST_AUDIO_MARKER": str(marker),
+            "TTS_ENGINE": config.engine,
+            "PIPER_PYTHON": str(config.piper_python),
+            "PIPER_MODEL": str(config.piper_model),
+            "PIPER_LENGTH_SCALE": str(config.piper_length_scale),
+            "PIPER_VOLUME": str(config.piper_volume),
             "EDGE_TTS_VOICE": config.voice,
             "EDGE_TTS_RATE": config.rate,
             "EDGE_TTS_VOLUME": config.tts_volume,
@@ -73,11 +78,11 @@ def _run_stream(text: str, config: Config, tick: subprocess.Popen[bytes], indica
         }
     )
     log_path = paths / "tts.log"
-    _log(log_path, f"API_ATTEMPT_START n={attempt} voice={config.voice}")
+    _log(log_path, f"TTS_ATTEMPT_START engine={config.engine} n={attempt}")
     started = time.monotonic()
     with log_path.open("ab", buffering=0) as log:
         streamer = subprocess.Popen(
-            [str(config.edge_python), "-m", "selected_text_speech.streamer"],
+            [str(config.piper_python if config.engine == "piper" else config.edge_python), "-m", "selected_text_speech.streamer"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=log,
@@ -85,11 +90,20 @@ def _run_stream(text: str, config: Config, tick: subprocess.Popen[bytes], indica
         )
         assert streamer.stdin is not None and streamer.stdout is not None
         try:
+            player_args = [
+                "mpv", "--no-video",
+                f"--speed={1.0 if config.engine == 'piper' else config.playback_speed}",
+                f"--volume={config.playback_volume}", "--really-quiet", "--cache=no",
+            ]
+            if config.engine == "piper":
+                player_args.extend([
+                    "--demuxer=rawaudio", "--demuxer-rawaudio-format=s16le",
+                    f"--demuxer-rawaudio-rate={config.piper_sample_rate}",
+                    f"--demuxer-rawaudio-channels={config.piper_channels}",
+                ])
+            player_args.append("-")
             player = subprocess.Popen(
-                [
-                    "mpv", "--no-video", f"--speed={config.playback_speed}",
-                    f"--volume={config.playback_volume}", "--really-quiet", "--cache=no", "-",
-                ],
+                player_args,
                 stdin=streamer.stdout,
                 stdout=subprocess.DEVNULL,
                 stderr=log,
@@ -111,7 +125,8 @@ def _run_stream(text: str, config: Config, tick: subprocess.Popen[bytes], indica
     elapsed = time.monotonic() - started
     _log(
         log_path,
-        f"API_ATTEMPT_END n={attempt} elapsed={elapsed:.2f}s first_audio={str(first_audio).lower()} "
+        f"TTS_ATTEMPT_END engine={config.engine} n={attempt} elapsed={elapsed:.2f}s "
+        f"first_audio={str(first_audio).lower()} "
         f"stream_exit={streamer_code} player_exit={player_code}",
     )
     return streamer_code, player_code, first_audio
@@ -144,7 +159,7 @@ def run() -> int:
                 start_new_session=True,
                 env=indicator_env,
             )
-        _log(log_path, f"WORKER_START voice={config.voice} speed={config.playback_speed}")
+        _log(log_path, f"WORKER_START engine={config.engine} speed={config.playback_speed}")
         _play(config, config.start_sound, log_path)
         with (state_dir() / "tick.log").open("ab") as tick_log:
             tick = subprocess.Popen(
@@ -169,7 +184,7 @@ def run() -> int:
                 _log(log_path, f"API_RETRY n={attempt} delay={delay:.1f}s")
                 time.sleep(delay)
         _log(log_path, f"WORKER_ERROR no_audio attempts={config.max_attempts}")
-        _notify(f"Edge TTS не прислал аудио после {config.max_attempts} попыток; смотри tts.log")
+        _notify(f"TTS не прислал аудио после {config.max_attempts} попыток; смотри .runtime/tts.log")
         return 1
     except Cancelled:
         _log(log_path, "WORKER_CANCELLED")
