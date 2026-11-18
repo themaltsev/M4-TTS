@@ -72,7 +72,7 @@ jobs:
             throw "Shortcut does not pass run-tray.vbs: $($shortcut.Arguments)"
           }
 
-          $uninstallShortcutPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Удалить Selected Text Speech.lnk'
+          $uninstallShortcutPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Uninstall Selected Text Speech.lnk'
           if (-not (Test-Path $uninstallShortcutPath)) {
             throw "Missing uninstall shortcut: $uninstallShortcutPath"
           }
