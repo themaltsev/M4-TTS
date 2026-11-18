@@ -72,9 +72,25 @@ jobs:
 
           $wscript = Join-Path $env:WINDIR 'System32\wscript.exe'
           $arguments = '"{0}" "{1}"' -f $runner, $appExe
-          $launch = Start-Process -FilePath $wscript -ArgumentList $arguments -Wait -PassThru
-          if ($launch.ExitCode -ne 0) {
-            throw "Windows Script Host failed with exit code $($launch.ExitCode)"
+          $launch = Start-Process -FilePath $wscript -ArgumentList $arguments -PassThru
+          $appProcess = $null
+          $deadline = (Get-Date).AddSeconds(20)
+          try {
+            do {
+              $appProcess = Get-Process -Name 'selected-text-speech' -ErrorAction SilentlyContinue |
+                Select-Object -First 1
+              if ($appProcess) { break }
+              Start-Sleep -Milliseconds 500
+            } while ((Get-Date) -lt $deadline)
+            if (-not $appProcess) {
+              throw 'run-tray.vbs did not start selected-text-speech.exe through WScript'
+            }
+          }
+          finally {
+            if ($appProcess) {
+              Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
+            }
+            Stop-Process -Id $launch.Id -Force -ErrorAction SilentlyContinue
           }
       - uses: actions/upload-artifact@v4
         with:
