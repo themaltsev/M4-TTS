@@ -1,0 +1,40 @@
+name: Windows installer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'windows/**'
+      - '.github/workflows/windows-installer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install app dependencies and packager
+        run: python -m pip install --upgrade edge-tts pygame keyboard pystray pillow pyinstaller
+      - name: Build Windows executable
+        run: >-
+          pyinstaller --clean --noconfirm --onefile --console
+          --name selected-text-speech
+          --collect-all edge_tts --collect-all pygame --collect-all pystray
+          --collect-all PIL --hidden-import keyboard
+          windows/speech.py
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+      - name: Build installer
+        run: iscc windows/installer.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: install-windows
+          path: dist/install-windows.exe
+          if-no-files-found: error
+          retention-days: 30

@@ -2,15 +2,10 @@
 set -euo pipefail
 
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-model_name="ru_RU-irina-medium"
 model_dir="$repo_dir/models"
-model_path="$model_dir/$model_name.onnx"
-model_json="$model_path.json"
-model_sha256="8ff38212d23da300bbe3705c645e6e5b9475f0bfde01558eb17813e22acaaaaa"
-model_base_url="https://huggingface.co/rhasspy/piper-voices/resolve/main/ru/ru_RU/irina/medium"
 
 if [[ "$(id -u)" -eq 0 ]]; then
-  echo "Запусти ./install.sh от своего пользователя из графического сеанса, не через sudo." >&2
+  echo "Запусти ./install-linux.sh от своего пользователя из графического сеанса, не через sudo." >&2
   exit 1
 fi
 if [[ ! -f /etc/os-release ]] || ! . /etc/os-release || [[ "${ID:-}" != ubuntu ]]; then
@@ -18,7 +13,7 @@ if [[ ! -f /etc/os-release ]] || ! . /etc/os-release || [[ "${ID:-}" != ubuntu ]
   exit 1
 fi
 if ! command -v gsettings >/dev/null || ! gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings >/dev/null 2>&1; then
-  echo "Не вижу активный сеанс GNOME. Запусти ./install.sh из Терминала на рабочем столе Ubuntu." >&2
+  echo "Не вижу активный сеанс GNOME. Запусти ./install-linux.sh из Терминала на рабочем столе Ubuntu." >&2
   exit 1
 fi
 if ! command -v sudo >/dev/null; then
@@ -46,26 +41,9 @@ mkdir -p "$repo_dir/.runtime" "$model_dir"
 if [[ ! -x "$repo_dir/.venv/bin/python" ]]; then
   python3 -m venv "$repo_dir/.venv"
 fi
-"$repo_dir/.venv/bin/python" -m pip install -r "$repo_dir/requirements-piper.txt"
+"$repo_dir/.venv/bin/python" -m pip install -r "$repo_dir/requirements-piper.txt" -r "$repo_dir/requirements-edge.txt"
 
-model_valid=false
-if [[ -f "$model_path" ]]; then
-  actual_sha="$(sha256sum "$model_path" | cut -d ' ' -f 1)"
-  [[ "$actual_sha" == "$model_sha256" ]] && model_valid=true
-fi
-if [[ "$model_valid" != true ]]; then
-  model_tmp="$(mktemp "$model_dir/.$model_name.XXXXXX")"
-  trap 'rm -f "$model_tmp"' EXIT
-  curl --fail --location --retry 3 --output "$model_tmp" "$model_base_url/$model_name.onnx"
-  actual_sha="$(sha256sum "$model_tmp" | cut -d ' ' -f 1)"
-  if [[ "$actual_sha" != "$model_sha256" ]]; then
-    echo "Хеш Piper-модели не совпал; скачанный файл оставлен вне установки." >&2
-    exit 1
-  fi
-  mv "$model_tmp" "$model_path"
-  trap - EXIT
-  curl --fail --location --retry 3 --output "$model_json" "$model_base_url/$model_name.onnx.json"
-fi
+"$repo_dir/.venv/bin/python" "$repo_dir/scripts/download_voice.py" "$model_dir"
 
 # Reuse the current GNOME binding but make it launch source directly from this checkout.
 custom_schema="org.gnome.settings-daemon.plugins.media-keys.custom-keybinding"
@@ -124,6 +102,30 @@ if [[ -d "/usr/share/gnome-shell/extensions/$indicator_extension" ]] && command 
 fi
 
 echo
-echo "Установка завершена. Хоткей запускает исходники прямо из: $repo_dir"
-echo "Горячая клавиша: Super (⌘ на клавиатуре Mac) + Escape"
-echo "Piper, модель, конфиг и журнал находятся внутри проекта; после установки озвучивание работает офлайн."
+autostart_answer=n
+if [[ -r /dev/tty ]]; then
+  read -r -p "Добавить хоткей Super+Escape в GNOME? [y/n] " autostart_answer </dev/tty || autostart_answer=n
+else
+  echo "Терминал недоступен: существующая привязка хоткея оставлена без изменений."
+fi
+if [[ "$autostart_answer" =~ ^[YyДд]$ ]]; then
+  echo "Хоткей включён и запускает исходники проекта напрямую."
+elif [[ -r /dev/tty ]]; then
+  current_key_list="$(gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings)"
+  cleaned_key_list="$(python3 - "$current_key_list" "$key_path" <<'PY'
+import ast
+import sys
+raw, remove_path = sys.argv[1:]
+if raw.startswith("@as"):
+    raw = raw[3:].strip()
+paths = [path for path in ast.literal_eval(raw) if path != remove_path]
+print("[" + ", ".join(repr(path) for path in paths) + "]")
+PY
+)"
+  gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "$cleaned_key_list"
+  echo "Хоткей отключён; команды можно запускать вручную из проекта."
+fi
+echo
+echo "Установка завершена. Хоткей: Super (⌘ на клавиатуре Mac) + Escape."
+echo "Движок выбирается через TTS_ENGINE=piper или TTS_ENGINE=edge в config.local.env."
+echo "Код, модели, настройки и журнал остаются внутри checkout."

@@ -1,58 +1,66 @@
-# Озвучивание выделенного текста для Ubuntu GNOME
+# Озвучивание выделенного текста для Linux, Windows и macOS
 
-Проект целиком запускается из этого checkout на MacBook с Ubuntu: выдели текст и нажми **Super (⌘ на клавиатуре Mac) + Escape**. GNOME вызывает `linux-gnome/bin/speak-selection` напрямую из репозитория. Код, Piper, модель, локальные настройки и журнал не копируются в `~/.local/bin` или `~/.local/lib`.
-
-По умолчанию используется **локальный Piper** с русским голосом Irina. После первоначальной установки синтез работает офлайн. Модель и виртуальное окружение находятся в игнорируемых Git каталогах `models/` и `.venv/`, а потому не попадают в GitHub; установщик скачивает модель с проверкой SHA-256. Локальные пользовательские настройки хранятся в игнорируемом `config.local.env`; `config.env` — версионный шаблон.
+Одна логика приложения для трёх платформ: выдели текст и нажми настроенное сочетание клавиш. Поведение одинаковое по сути — выбранный движок озвучивает выделение, повторное нажатие останавливает речь, а при пустом выделении показывается системное уведомление. Хоткеи, чтение clipboard, tray и уведомления подключены нативно для каждой ОС.
 
 ## Установка
 
-Запусти команды в Терминале внутри графического сеанса Ubuntu:
+| Платформа | Установщик |
+|---|---|
+| Ubuntu GNOME | `./install-linux.sh` |
+| Windows 10/11 x64 | `install-windows.exe` |
+| macOS | `./install-mac.sh` |
 
-```bash
-cd /home/user/ozvuchka-videlenogo-teksta
-./install.sh
+На Linux запускай установщик из графического сеанса и от обычного пользователя. macOS требует Homebrew; Windows-инсталлятор включает приложение и Piper-voice runtime. Выбор движка хранится в пользовательском конфиге платформы.
+
+## Движок и конфигурация
+
+На всех платформах используются одинаковые значения:
+
+```ini
+TTS_ENGINE=piper
+# либо
+TTS_ENGINE=edge
 ```
 
-Установщик ставит системные аудио- и GNOME-зависимости через `sudo apt`, подготавливает `.venv`, получает Piper-модель в `models/` и назначает хоткей напрямую на скрипт в checkout. Запускай `install.sh` обычным пользователем, **не** через `sudo`.
+- `piper` — локальный синтез русским голосом Irina. После первоначальной установки работает без интернета.
+- `edge` — Edge TTS, требует интернет и отправляет текст в сервис Microsoft.
 
-## Команды
+Остальные основные ключи тоже общие: `PIPER_MODEL`, `PIPER_LENGTH_SCALE`, `PIPER_VOLUME`, `EDGE_TTS_VOICE`, `EDGE_TTS_RATE`, `EDGE_TTS_VOLUME`, `EDGE_TTS_PITCH`, `MPV_PLAYBACK_SPEED`, `MPV_PLAYBACK_VOLUME` и `HOTKEY`. Примеры и значения по умолчанию находятся в `config.env`.
 
-Запускай из корня репозитория:
+Расположение пользовательского конфига:
+
+- Linux checkout: `config.local.env` в корне проекта (не коммитится).
+- macOS: `~/Library/Application Support/selected-text-speech/config.env`.
+- Windows: `%APPDATA%\selected-text-speech\config.env`.
+
+## Поведение платформ
+
+- **Linux/GNOME:** `Super+Escape` по умолчанию; выбор выделения через Wayland clipboard или X11 clipboard; пустое выделение сообщает через `notify-send`.
+- **macOS:** `cmd+esc`; menu-bar приложение и системное уведомление Notification Center; для чтения выделения нужны разрешения Accessibility/Input Monitoring.
+- **Windows:** `ctrl+alt+s`; tray-приложение, clipboard возвращается после чтения; уведомление показывается через системный tray notification.
+
+Глобальный хоткей и системные API имеют платформенные реализации, но движок, параметры голоса, остановка и сценарий пустого выделения одинаковы.
+
+## Команды Linux
+
+Из корня checkout:
 
 ```bash
 ./linux-gnome/bin/speak "текст для озвучивания"
 cat article.txt | ./linux-gnome/bin/speak
-./linux-gnome/bin/speak-selection   # toggle: озвучить выделение / остановить
+./linux-gnome/bin/speak-selection   # озвучить выделение / повторно нажать для остановки
 ./linux-gnome/bin/stop-speech
 ./linux-gnome/bin/speak-status
 ```
 
-## Настройка
+На Linux хоткей запускает приложение прямо из `linux-gnome/bin/speak-selection` в текущем checkout. Python-окружение, модель, настройки, журналы и временное состояние располагаются внутри checkout в игнорируемых Git каталогах.
 
-Редактируй `config.local.env` в корне проекта (он не попадёт в Git). Поддерживаются:
+## Структура проекта
 
-- `TTS_ENGINE=piper` — локальный голос по умолчанию; `TTS_ENGINE=edge` — прежний онлайн-движок.
-- `PIPER_MODEL` — путь к ONNX-модели относительно корня проекта или абсолютный.
-- `PIPER_LENGTH_SCALE` — скорость Piper; если не задана, рассчитывается из `MPV_PLAYBACK_SPEED` с сохранением высоты голоса.
-- `MPV_PLAYBACK_VOLUME`, `CUE_VOLUME`, `TICK_VOLUME_DB` — громкость речи и сигналов.
-- `START_SOUND`, `CANCEL_SOUND`, `TICK_SOUND` — файлы сигналов из каталога проекта `linux-gnome/share/sounds/`.
-- Параметры `EDGE_TTS_*` применяются, только если явно выбран `TTS_ENGINE=edge`.
-
-Чтобы включить Edge TTS, создай `.venv-edge` и установи `requirements-edge.txt`:
-
-```bash
-python3 -m venv .venv-edge
-.venv-edge/bin/python -m pip install -r requirements-edge.txt
-```
-
-Журнал, PID-файл и временные маркеры находятся в `.runtime/`; эта директория игнорируется Git.
-
-## Структура
-
-- `linux-gnome/bin/` — команды, запускаемые непосредственно из checkout.
-- `linux-gnome/src/selected_text_speech/` — логика приложения и потоковая озвучка Piper/Edge.
-- `linux-gnome/share/sounds/` — звуковые сигналы.
-- `install.sh` — системные зависимости, локальное окружение и привязка GNOME.
-- `requirements-piper.txt` — фиксированная версия Piper.
-- `requirements-edge.txt` — необязательный Edge TTS.
-- `THIRD_PARTY.md` — лицензии движка и голосовой модели.
+- `linux-gnome/` — команды, GTK/tray indicator, clipboard и потоковая выдача аудио в Linux.
+- `macos/speech.py` — menu-bar runtime, глобальный хоткей и Notification Center.
+- `windows/speech.py` — Windows tray runtime и системные уведомления.
+- `install-linux.sh`, `install-mac.sh`, `windows/installer.iss` — platform installers.
+- `requirements-piper.txt`, `requirements-edge.txt` — фиксируемые зависимости движков.
+- `scripts/download_voice.py` — загрузка голоса с проверкой SHA-256.
+- `THIRD_PARTY.md` — лицензии Piper и модели голоса.
