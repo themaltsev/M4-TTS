@@ -35,10 +35,10 @@ Source: "..\dist\models\ru_RU-irina-medium.onnx.json"; DestDir: "{app}\models"; 
 Source: "run-tray.vbs"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{userprograms}\Selected Text Speech"; Filename: "{app}\run-tray.vbs"; Parameters: """{app}\{#AppExe}"""; WorkingDir: "{app}"
+Name: "{userprograms}\Selected Text Speech"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\run-tray.vbs"" ""{app}\{#AppExe}"""; WorkingDir: "{app}"
 
 [Run]
-Filename: "{app}\run-tray.vbs"; Parameters: """{app}\{#AppExe}"""; Flags: skipifsilent nowait
+Filename: "{sys}\wscript.exe"; Parameters: """{app}\run-tray.vbs"" ""{app}\{#AppExe}"""; Flags: skipifsilent nowait
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /T /IM {#AppExe}"; Flags: runhidden waituntilterminated; RunOnceId: "StopSelectedTextSpeech"
