@@ -102,7 +102,7 @@ class Config:
         except (FileNotFoundError, KeyError, TypeError, ValueError, json.JSONDecodeError):
             pass
 
-        edge_python = _project_path(os.environ.get("EDGE_TTS_PYTHON", ".venv-edge/bin/python"), root)
+        edge_python = _project_path(os.environ.get("EDGE_TTS_PYTHON", ".venv/bin/python"), root)
         return cls(
             engine=engine,
             voice=os.environ.get("EDGE_TTS_VOICE", "ru-RU-SvetlanaNeural"),

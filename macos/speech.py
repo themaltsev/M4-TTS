@@ -8,6 +8,7 @@ import signal
 import subprocess
 import sys
 import threading
+from itertools import chain
 import time
 from pathlib import Path
 
@@ -23,6 +24,10 @@ LOG = STATE / "tts.log"
 
 def settings() -> dict[str, str]:
     values = {
+        "TTS_ENGINE": "piper",
+        "PIPER_MODEL": str(SUPPORT / "models" / "ru_RU-irina-medium.onnx"),
+        "PIPER_LENGTH_SCALE": "",
+        "PIPER_VOLUME": "1.0",
         "EDGE_TTS_VOICE": "ru-RU-SvetlanaNeural", "EDGE_TTS_RATE": "+0%",
         "EDGE_TTS_VOLUME": "+0%", "EDGE_TTS_PITCH": "+0Hz",
         "EDGE_TTS_CONNECT_TIMEOUT": "10", "EDGE_TTS_RECEIVE_TIMEOUT": "60",
@@ -40,6 +45,12 @@ def settings() -> dict[str, str]:
     except FileNotFoundError:
         pass
     values.update({key: value for key, value in os.environ.items() if key in values})
+    model_path = Path(values["PIPER_MODEL"]).expanduser()
+    if not model_path.is_absolute():
+        model_path = SUPPORT / model_path
+    values["PIPER_MODEL"] = str(model_path)
+    if not values["PIPER_LENGTH_SCALE"].strip():
+        values["PIPER_LENGTH_SCALE"] = str(1.0 / float(values["MPV_PLAYBACK_SPEED"]))
     return values
 
 
@@ -129,10 +140,66 @@ def _cancel(_signum: int, _frame: object) -> None:
     raise Cancelled
 
 
-async def worker(text: str) -> int:
-    import edge_tts
+def piper_worker(text: str, cfg: dict[str, str]) -> int:
+    from piper import PiperVoice, SynthesisConfig
 
+    voice = PiperVoice.load(cfg["PIPER_MODEL"])
+    synthesis = SynthesisConfig(
+        length_scale=float(cfg["PIPER_LENGTH_SCALE"]),
+        volume=float(cfg["PIPER_VOLUME"]),
+    )
+    chunks = iter(voice.synthesize(text, syn_config=synthesis))
+    first = next(chunks, None)
+    if first is None:
+        raise RuntimeError("Piper не вернул аудио")
+    with LOG.open("ab") as player_log:
+        player = subprocess.Popen(
+            ["mpv", "--no-video", "--really-quiet", "--cache=no",
+             "--demuxer=rawaudio", "--demuxer-rawaudio-format=s16le",
+             f"--demuxer-rawaudio-rate={first.sample_rate}",
+             f"--demuxer-rawaudio-channels={first.sample_channels}", "-"],
+            stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=player_log,
+        )
+    assert player.stdin is not None
+    try:
+        for chunk in chain((first,), chunks):
+            player.stdin.write(chunk.audio_int16_bytes)
+            player.stdin.flush()
+            if not PLAYING.exists():
+                PLAYING.write_text(str(time.time()), encoding="ascii")
+        player.stdin.close()
+        player.stdin = None
+        result = player.wait()
+        if result:
+            raise RuntimeError(f"mpv exited with status {result}")
+        return 0
+    except Exception:
+        if player.poll() is None:
+            player.terminate()
+            try:
+                player.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                player.kill()
+        raise
+
+
+async def worker(text: str) -> int:
     cfg = settings()
+    engine = cfg["TTS_ENGINE"].strip().lower()
+    if engine == "piper":
+        try:
+            return piper_worker(text, cfg)
+        except Cancelled:
+            raise
+        except Exception as error:
+            with LOG.open("a", encoding="utf-8") as log:
+                log.write(f"PIPER_ERROR {type(error).__name__}: {error}\n")
+            return 1
+    if engine != "edge":
+        with LOG.open("a", encoding="utf-8") as log:
+            log.write(f"CONFIG_ERROR unsupported TTS_ENGINE={engine}\n")
+        return 1
+    import edge_tts
     attempts = max(1, min(8, int(cfg["API_MAX_ATTEMPTS"])))
     log_path = LOG
     for attempt in range(1, attempts + 1):
@@ -192,10 +259,18 @@ async def worker(text: str) -> int:
     return 1
 
 
+def notify_no_selection() -> None:
+    subprocess.run(
+        ["osascript", "-e", 'display notification "Сначала выдели текст" with title "Озвучивание"'],
+        check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5,
+    )
+
+
 def selection() -> None:
     import pynput.keyboard
 
     previous = subprocess.run(["pbpaste"], capture_output=True, check=False).stdout
+    subprocess.run(["pbcopy"], input=b"", check=False)
     controller = pynput.keyboard.Controller()
     with controller.pressed(pynput.keyboard.Key.cmd):
         controller.press("c")
@@ -205,6 +280,8 @@ def selection() -> None:
     subprocess.run(["pbcopy"], input=previous, check=False)
     if selected.strip():
         start(selected)
+    else:
+        notify_no_selection()
 
 
 def hotkey_listener(shortcut: str) -> None:

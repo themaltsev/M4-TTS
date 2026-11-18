@@ -14,7 +14,7 @@ repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 app_dir="$HOME/Library/Application Support/selected-text-speech"
 config_dir="$HOME/Library/Application Support/selected-text-speech"
 venv="$app_dir/venv"
-bin_dir="$HOME/.local/bin"
+bin_dir="$app_dir/bin"
 launch_agent="$HOME/Library/LaunchAgents/com.themaltsev.selected-text-speech.plist"
 label="com.themaltsev.selected-text-speech"
 
@@ -28,26 +28,26 @@ mkdir -p "$app_dir/state" "$config_dir" "$bin_dir" "$HOME/Library/LaunchAgents"
 if [[ ! -x "$venv/bin/python" ]]; then
   "$python_bin" -m venv "$venv"
 fi
-"$venv/bin/python" -m pip install --upgrade edge-tts rumps pynput
+"$venv/bin/python" -m pip install -r "$repo_dir/requirements-piper.txt" -r "$repo_dir/requirements-edge.txt" rumps pynput
 install -m 0644 "$repo_dir/macos/speech.py" "$app_dir/speech.py"
+"$venv/bin/python" "$repo_dir/scripts/download_voice.py" "$app_dir/models"
 
 if [[ ! -e "$config_dir/config.env" ]]; then
-  cat > "$config_dir/config.env" <<'EOF'
-EDGE_TTS_VOICE=ru-RU-SvetlanaNeural
-EDGE_TTS_RATE=+0%
-EDGE_TTS_VOLUME=+0%
-EDGE_TTS_PITCH=+0Hz
-EDGE_TTS_CONNECT_TIMEOUT=10
-EDGE_TTS_RECEIVE_TIMEOUT=60
-MPV_PLAYBACK_SPEED=1.35
-MPV_PLAYBACK_VOLUME=100
-API_MAX_ATTEMPTS=3
-API_RETRY_BASE_SECONDS=1.5
-API_RETRY_MAX_SECONDS=8
-HOTKEY=cmd+esc
-EOF
-elif ! grep -Eq '^[[:space:]]*HOTKEY[[:space:]]*=' "$config_dir/config.env"; then
+  cp "$repo_dir/config.env" "$config_dir/config.env"
   printf '\nHOTKEY=cmd+esc\n' >> "$config_dir/config.env"
+else
+  if ! grep -Eq '^[[:space:]]*TTS_ENGINE[[:space:]]*=' "$config_dir/config.env"; then
+    cat >> "$config_dir/config.env" <<'EOF'
+
+# Выбор синтеза: piper — локально, edge — онлайн через интернет.
+# Переключение: поменяй TTS_ENGINE и сохрани конфиг.
+TTS_ENGINE=piper
+PIPER_MODEL=models/ru_RU-irina-medium.onnx
+EOF
+  fi
+  if ! grep -Eq '^[[:space:]]*HOTKEY[[:space:]]*=' "$config_dir/config.env"; then
+    printf '\nHOTKEY=cmd+esc\n' >> "$config_dir/config.env"
+  fi
 fi
 
 for command_name in speak speak-selection stop-speech speak-status selected-text-speech-tray; do
@@ -103,5 +103,5 @@ else
 fi
 
 echo "Установка завершена. Хоткей: смотри $config_dir/config.env (по умолчанию cmd+esc)."
-echo "Команды установлены в $bin_dir; добавь этот каталог в PATH, если он ещё не добавлен."
+echo "Команды размещены внутри приложения: $bin_dir (PATH и ~/.local/bin не меняются)."
 echo "Для хоткея выделения разреши Accessibility/Input Monitoring для Python в System Settings → Privacy & Security."

@@ -7,9 +7,12 @@ import subprocess
 import sys
 import tempfile
 import time
+import wave
 from pathlib import Path
 
 APP = "selected-text-speech"
+APP_DIR = (Path(sys.executable).resolve().parent if getattr(sys, "frozen", False)
+           else Path(__file__).resolve().parents[1])
 ROOT = Path(os.environ.get("LOCALAPPDATA", Path.home())) / APP
 STATE = ROOT / "state"
 CONFIG = Path(os.environ.get("APPDATA", Path.home())) / APP / "config.env"
@@ -22,6 +25,10 @@ LOG = STATE / "tts.log"
 
 def settings() -> dict[str, str]:
     values = {
+        "TTS_ENGINE": "piper",
+        "PIPER_MODEL": str(APP_DIR / "models" / "ru_RU-irina-medium.onnx"),
+        "PIPER_LENGTH_SCALE": "",
+        "PIPER_VOLUME": "1.0",
         "EDGE_TTS_VOICE": "ru-RU-SvetlanaNeural", "EDGE_TTS_RATE": "+0%",
         "EDGE_TTS_VOLUME": "+0%", "EDGE_TTS_PITCH": "+0Hz",
         "MPV_PLAYBACK_SPEED": "1.35", "MPV_PLAYBACK_VOLUME": "100",
@@ -38,6 +45,12 @@ def settings() -> dict[str, str]:
     except FileNotFoundError:
         pass
     values.update({k: v for k, v in os.environ.items() if k in values})
+    model_path = Path(values["PIPER_MODEL"]).expanduser()
+    if not model_path.is_absolute():
+        model_path = APP_DIR / model_path
+    values["PIPER_MODEL"] = str(model_path)
+    if not values["PIPER_LENGTH_SCALE"].strip():
+        values["PIPER_LENGTH_SCALE"] = str(1.0 / float(values["MPV_PLAYBACK_SPEED"]))
     return values
 
 
@@ -94,47 +107,84 @@ def start(text: str) -> int:
     return proc.pid
 
 
+def piper_audio_file(text: str, cfg: dict[str, str]) -> Path:
+    from piper import PiperVoice, SynthesisConfig
+
+    model = Path(cfg["PIPER_MODEL"])
+    if not model.is_file():
+        raise FileNotFoundError(f"Модель Piper не найдена: {model}")
+    voice = PiperVoice.load(str(model))
+    syn_config = SynthesisConfig(
+        length_scale=float(cfg["PIPER_LENGTH_SCALE"]),
+        volume=float(cfg["PIPER_VOLUME"]),
+    )
+    fd, name = tempfile.mkstemp(suffix=".wav")
+    os.close(fd)
+    path = Path(name)
+    try:
+        with wave.open(str(path), "wb") as wav_file:
+            voice.synthesize_wav(text, wav_file, syn_config=syn_config)
+        return path
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
+
+
 async def worker(text: str) -> int:
-    import edge_tts
     import pygame
 
     cfg = settings()
     max_attempts = max(1, min(8, int(cfg["API_MAX_ATTEMPTS"])))
     for attempt in range(1, max_attempts + 1):
-        audio = bytearray()
+        audio_path: Path | None = None
         try:
-            communicate = edge_tts.Communicate(
-                text, voice=cfg["EDGE_TTS_VOICE"], rate=cfg["EDGE_TTS_RATE"],
-                volume=cfg["EDGE_TTS_VOLUME"], pitch=cfg["EDGE_TTS_PITCH"])
-            async for chunk in communicate.stream():
-                if chunk["type"] == "audio":
-                    audio.extend(chunk["data"])
-            if not audio:
-                raise RuntimeError("Edge TTS не вернул аудио")
-            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as out:
-                out.write(audio); audio_path = Path(out.name)
-            try:
-                pygame.mixer.init()
-                pygame.mixer.music.load(str(audio_path))
-                pygame.mixer.music.set_volume(max(0, min(100, int(cfg["MPV_PLAYBACK_VOLUME"]))) / 100)
-                PLAYING.write_text(str(time.time()), encoding="ascii")
-                pygame.mixer.music.play()
-                while pygame.mixer.music.get_busy():
-                    await asyncio.sleep(0.15)
-            finally:
-                pygame.mixer.quit(); audio_path.unlink(missing_ok=True)
+            engine = cfg["TTS_ENGINE"].strip().lower()
+            if engine == "piper":
+                audio_path = piper_audio_file(text, cfg)
+            elif engine == "edge":
+                import edge_tts
+                audio = bytearray()
+                communicate = edge_tts.Communicate(
+                    text, voice=cfg["EDGE_TTS_VOICE"], rate=cfg["EDGE_TTS_RATE"],
+                    volume=cfg["EDGE_TTS_VOLUME"], pitch=cfg["EDGE_TTS_PITCH"])
+                async for chunk in communicate.stream():
+                    if chunk["type"] == "audio":
+                        audio.extend(chunk["data"])
+                if not audio:
+                    raise RuntimeError("Edge TTS не вернул аудио")
+                with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as out:
+                    out.write(audio)
+                    audio_path = Path(out.name)
+            else:
+                raise ValueError("TTS_ENGINE должен быть piper или edge")
+
+            pygame.mixer.init()
+            pygame.mixer.music.load(str(audio_path))
+            pygame.mixer.music.set_volume(max(0, min(100, int(cfg["MPV_PLAYBACK_VOLUME"]))) / 100)
+            PLAYING.write_text(str(time.time()), encoding="ascii")
+            pygame.mixer.music.play()
+            while pygame.mixer.music.get_busy():
+                await asyncio.sleep(0.15)
+            pygame.mixer.quit()
             return 0
         except Exception as exc:
             PLAYING.unlink(missing_ok=True)
+            try:
+                pygame.mixer.quit()
+            except Exception:
+                pass
             with LOG.open("a", encoding="utf-8") as log:
                 log.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')} ATTEMPT {attempt} {type(exc).__name__}: {exc}\n")
             if attempt >= max_attempts:
                 return 1
             await asyncio.sleep(min(float(cfg["API_RETRY_MAX_SECONDS"]), float(cfg["API_RETRY_BASE_SECONDS"]) * 2 ** (attempt - 1)))
+        finally:
+            if audio_path is not None:
+                audio_path.unlink(missing_ok=True)
     return 1
 
 
-def selection() -> int:
+def selection(notify_empty=None) -> int:
     # Ctrl+C is used only on explicit hotkey; restore clipboard text afterwards.
     import keyboard
     import tkinter as tk
@@ -142,16 +192,23 @@ def selection() -> int:
     try:
         try: previous = root.clipboard_get()
         except tk.TclError: previous = ""
+        root.clipboard_clear(); root.update()
         keyboard.press_and_release("ctrl+c")
         time.sleep(0.18)
         try: text = root.clipboard_get()
         except tk.TclError: text = ""
+        root.clipboard_clear()
         if previous:
-            root.clipboard_clear(); root.clipboard_append(previous); root.update()
+            root.clipboard_append(previous)
+        root.update()
     finally:
         root.destroy()
     if not text.strip():
-        print("Не удалось получить выделенный текст", file=sys.stderr); return 1
+        if notify_empty is not None:
+            notify_empty()
+        else:
+            print("Сначала выдели текст", file=sys.stderr)
+        return 0
     start(text); return 0
 
 
@@ -226,7 +283,7 @@ def tray() -> None:
 
     def on_hotkey() -> None:
         try:
-            selection()
+            selection(lambda: icon.notify("Сначала выдели текст", "Озвучивание"))
         except Exception as exc:
             with LOG.open("a", encoding="utf-8") as log:
                 log.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')} HOTKEY_ERROR {type(exc).__name__}: {exc}\n")
