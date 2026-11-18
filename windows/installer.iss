@@ -37,7 +37,7 @@ Source: "uninstall-windows.cmd"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{userprograms}\Selected Text Speech"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\run-tray.vbs"" ""{app}\{#AppExe}"""; WorkingDir: "{app}"
-Name: "{userprograms}\Удалить Selected Text Speech"; Filename: "{uninstallexe}"; WorkingDir: "{app}"
+Name: "{userprograms}\Удалить Selected Text Speech"; Filename: "{app}\unins000.exe"; WorkingDir: "{app}"
 
 [Run]
 Filename: "{sys}\wscript.exe"; Parameters: """{app}\run-tray.vbs"" ""{app}\{#AppExe}"""; Flags: skipifsilent nowait

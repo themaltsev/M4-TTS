@@ -77,7 +77,7 @@ jobs:
             throw "Missing uninstall shortcut: $uninstallShortcutPath"
           }
           $uninstallShortcut = $shell.CreateShortcut($uninstallShortcutPath)
-          if ($uninstallShortcut.TargetPath -notlike '*\unins*.exe') {
+          if ($uninstallShortcut.TargetPath -ine $uninstaller) {
             throw "Uninstall shortcut does not target the uninstaller: $($uninstallShortcut.TargetPath)"
           }
 
