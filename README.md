@@ -12,6 +12,8 @@
 
 На Linux запускай установщик из графического сеанса и от обычного пользователя. macOS требует Homebrew; Windows-инсталлятор включает приложение и Piper-voice runtime. Выбор движка хранится в пользовательском конфиге платформы.
 
+Windows удаляется через «Параметры → Приложения → Установленные приложения» или через ярлык «Удалить Selected Text Speech» в меню «Пуск». В каталоге установки также есть `uninstall-windows.cmd`.
+
 ## Движок и конфигурация
 
 На всех платформах используются одинаковые значения:
@@ -62,7 +64,7 @@ cat article.txt | ./linux-gnome/bin/speak
 - `linux-gnome/` — команды, GTK/tray indicator, clipboard и потоковая выдача аудио в Linux.
 - `macos/speech.py` — menu-bar runtime, глобальный хоткей и Notification Center.
 - `windows/speech.py` — Windows tray runtime и системные уведомления.
-- `install-linux.sh`, `install-mac.sh`, `uninstall-linux.sh`, `windows/installer.iss` — platform installers and cleanup.
+- `install-linux.sh`, `install-mac.sh`, `uninstall-linux.sh`, `windows/installer.iss`, `windows/uninstall-windows.cmd` — platform installers and cleanup.
 - `requirements-piper.txt`, `requirements-edge.txt` — фиксируемые зависимости движков.
 - `scripts/download_voice.py` — загрузка голоса с проверкой SHA-256.
 - `THIRD_PARTY.md` — лицензии Piper и модели голоса.

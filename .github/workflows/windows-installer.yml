@@ -55,7 +55,9 @@ jobs:
           $installDir = Join-Path $env:LOCALAPPDATA 'SelectedTextSpeech'
           $appExe = Join-Path $installDir 'selected-text-speech.exe'
           $runner = Join-Path $installDir 'run-tray.vbs'
-          foreach ($path in @($appExe, $runner)) {
+          $uninstaller = Join-Path $installDir 'unins000.exe'
+          $uninstallCommand = Join-Path $installDir 'uninstall-windows.cmd'
+          foreach ($path in @($appExe, $runner, $uninstaller, $uninstallCommand)) {
             if (-not (Test-Path $path)) { throw "Missing installed file: $path" }
           }
 
@@ -68,6 +70,15 @@ jobs:
           }
           if ($shortcut.Arguments -notmatch 'run-tray\.vbs') {
             throw "Shortcut does not pass run-tray.vbs: $($shortcut.Arguments)"
+          }
+
+          $uninstallShortcutPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Удалить Selected Text Speech.lnk'
+          if (-not (Test-Path $uninstallShortcutPath)) {
+            throw "Missing uninstall shortcut: $uninstallShortcutPath"
+          }
+          $uninstallShortcut = $shell.CreateShortcut($uninstallShortcutPath)
+          if ($uninstallShortcut.TargetPath -notlike '*\unins*.exe') {
+            throw "Uninstall shortcut does not target the uninstaller: $($uninstallShortcut.TargetPath)"
           }
 
           $wscript = Join-Path $env:WINDIR 'System32\wscript.exe'

@@ -33,9 +33,11 @@ Source: "..\dist\selected-text-speech.exe"; DestDir: "{app}"; Flags: ignoreversi
 Source: "..\dist\models\ru_RU-irina-medium.onnx"; DestDir: "{app}\models"; Flags: ignoreversion
 Source: "..\dist\models\ru_RU-irina-medium.onnx.json"; DestDir: "{app}\models"; Flags: ignoreversion
 Source: "run-tray.vbs"; DestDir: "{app}"; Flags: ignoreversion
+Source: "uninstall-windows.cmd"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{userprograms}\Selected Text Speech"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\run-tray.vbs"" ""{app}\{#AppExe}"""; WorkingDir: "{app}"
+Name: "{userprograms}\Удалить Selected Text Speech"; Filename: "{uninstallexe}"; WorkingDir: "{app}"
 
 [Run]
 Filename: "{sys}\wscript.exe"; Parameters: """{app}\run-tray.vbs"" ""{app}\{#AppExe}"""; Flags: skipifsilent nowait
