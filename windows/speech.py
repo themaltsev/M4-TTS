@@ -63,6 +63,15 @@ def settings() -> dict[str, str]:
     return values
 
 
+def frozen_child_environment() -> dict[str, str] | None:
+    if not getattr(sys, "frozen", False):
+        return None
+    env = os.environ.copy()
+    # This child outlives its one-file parent; give it an independent _MEIPASS.
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+    return env
+
+
 def active_pid() -> int | None:
     try:
         pid = int(PID.read_text().strip())
@@ -105,7 +114,8 @@ def start(text: str) -> int:
         with LOG.open("a", encoding="utf-8") as log:
             proc = subprocess.Popen(worker_command,
                                     stdin=subprocess.PIPE, stdout=log, stderr=subprocess.STDOUT,
-                                    creationflags=subprocess.CREATE_NO_WINDOW)
+                                    creationflags=subprocess.CREATE_NO_WINDOW,
+                                    env=frozen_child_environment())
         PID.write_text(str(proc.pid), encoding="ascii")
     except Exception:
         PID.unlink(missing_ok=True)
@@ -344,13 +354,21 @@ def main() -> int:
         import pygame
         print(f"winsound ready; pygame {pygame.version.ver}")
         return 0
-    if args == ["--verify-local-piper"]:
+    if args and args[0] == "--verify-local-piper" and len(args) <= 2:
         audio_path = piper_audio_file("Проверка локального голоса", settings())
         try:
             print(f"Piper WAV ready: {audio_path.stat().st_size} bytes")
-            return 0
         finally:
             audio_path.unlink(missing_ok=True)
+        if len(args) == 2:
+            Path(args[1]).write_text("ok", encoding="ascii")
+        return 0
+    if args and args[0] == "--verify-detached-worker" and len(args) == 2:
+        command = [sys.executable, "--verify-local-piper", args[1]]
+        subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT,
+                         creationflags=subprocess.CREATE_NO_WINDOW,
+                         env=frozen_child_environment())
+        return 0
     if args == ["--worker"]:
         text = sys.stdin.buffer.read().decode("utf-8", errors="replace")
         try: return asyncio.run(worker(text))

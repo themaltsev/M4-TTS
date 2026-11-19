@@ -48,6 +48,20 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Packaged local Piper synthesis failed: $LASTEXITCODE"
           }
+          $marker = Join-Path $env:TEMP 'selected-text-speech-worker-smoke.txt'
+          Remove-Item $marker -Force -ErrorAction SilentlyContinue
+          & (Resolve-Path 'dist/selected-text-speech.exe') --verify-detached-worker $marker
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not start independent one-file worker: $LASTEXITCODE"
+          }
+          $deadline = (Get-Date).AddSeconds(90)
+          while (-not (Test-Path $marker) -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not (Test-Path $marker)) {
+            throw 'Detached one-file worker did not finish local Piper synthesis'
+          }
+          Remove-Item $marker -Force
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
       - name: Build installer
