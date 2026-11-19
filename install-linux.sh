@@ -115,7 +115,7 @@ Type=Application
 Name=M4-TTS
 Comment=Озвучивание выделенного текста
 Exec=$repo_dir/linux-gnome/bin/speak-tray
-Icon=audio-speakers
+Icon=$repo_dir/resources/m4-tts.svg
 Terminal=false
 Categories=Utility;Accessibility;
 EOF

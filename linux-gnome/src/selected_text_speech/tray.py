@@ -18,9 +18,10 @@ from .controller import stop_speech
 from .runtime import worker_pid
 
 ROOT = Path(__file__).resolve().parents[3]
-ICON = ROOT / "linux-gnome/share/icons/openclaw-tts-waiting.svg"
+IDLE_ICON = ROOT / "resources/m4-tts.svg"
+PLAYING_ICON = ROOT / "resources/m4-tts-playing.svg"
 indicator = AyatanaAppIndicator3.Indicator.new(
-    "selected-text-speech", str(ICON), AyatanaAppIndicator3.IndicatorCategory.APPLICATION_STATUS
+    "m4-tts", str(IDLE_ICON), AyatanaAppIndicator3.IndicatorCategory.APPLICATION_STATUS
 )
 indicator.set_status(AyatanaAppIndicator3.IndicatorStatus.ACTIVE)
 menu = Gtk.Menu()
@@ -44,6 +45,8 @@ indicator.set_menu(menu)
 def update() -> bool:
     pid = worker_pid()
     stop_item.set_sensitive(pid is not None)
+    active_icon = PLAYING_ICON if pid is not None else IDLE_ICON
+    indicator.set_icon_full(str(active_icon), "M4-TTS — озвучивание" if pid is not None else "M4-TTS — готово")
     if pid is None:
         description = f"Готово • {Config.load().engine}"
     else:

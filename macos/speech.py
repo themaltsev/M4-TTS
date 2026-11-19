@@ -20,6 +20,7 @@ PID = STATE / "worker.pid"
 STARTED = STATE / "started-at"
 PLAYING = STATE / "playing"
 LOG = STATE / "tts.log"
+TRAY_ICON = Path(__file__).resolve().parent / "resources" / "m4-tts.png"
 
 
 def settings() -> dict[str, str]:
@@ -313,7 +314,7 @@ def tray() -> None:
 
     class SpeechApp(rumps.App):
         def __init__(self) -> None:
-            super().__init__("◷", title="◷", quit_button=None)
+            super().__init__("M4-TTS", title=None, icon=str(TRAY_ICON), template=True, quit_button=None)
             self.stop_item = rumps.MenuItem("Остановить озвучивание", callback=self.stop_speech)
             self.hotkey_item = rumps.MenuItem(f"Хоткей: {cfg['HOTKEY']}")
             self.hotkey_item.set_callback(None)
@@ -326,7 +327,7 @@ def tray() -> None:
         def update_status(self, _timer: object) -> None:
             pid = active_pid()
             if pid is None:
-                self.title = "◷"
+                self.title = None
                 self.stop_item.set_callback(None)
                 return
             try:
@@ -334,14 +335,14 @@ def tray() -> None:
             except (OSError, ValueError):
                 elapsed = 0
             if PLAYING.exists():
-                self.title = f"▂▅▃ {elapsed}s"
+                self.title = f"{elapsed}s"
             else:
-                self.title = f"◷ {elapsed}s"
+                self.title = f"{elapsed}s"
             self.stop_item.set_callback(self.stop_speech)
 
         def stop_speech(self, _sender: object) -> None:
             stop()
-            self.title = "◷"
+            self.title = None
 
         def open_settings(self, _sender: object) -> None:
             subprocess.Popen([sys.executable, str(Path(__file__).resolve().with_name("settings_gui.py"))])

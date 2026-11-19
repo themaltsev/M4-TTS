@@ -250,7 +250,7 @@ def hotkey() -> None:
 def tray() -> None:
     import keyboard
     import pystray
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image
 
     STATE.mkdir(parents=True, exist_ok=True)
     try:
@@ -266,29 +266,11 @@ def tray() -> None:
             TRAY_PID.write_text(str(os.getpid()), encoding="ascii")
     cfg = settings()
 
-    def make_icon(mode: str, elapsed: int) -> Image.Image:
-        image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(image)
-        color = (255, 174, 65, 255) if mode == "waiting" else (65, 210, 145, 255)
-        if mode == "waiting":
-            draw.ellipse((10, 5, 54, 49), outline=color, width=5)
-            draw.line((32, 14, 32, 28, 41, 33), fill=color, width=4)
-        else:
-            for x, height in zip((14, 24, 34, 44, 54), (14, 28, 20, 34, 17)):
-                draw.rounded_rectangle((x - 3, 40 - height, x + 3, 40), radius=2, fill=color)
-        try:
-            font = ImageFont.truetype("arial.ttf", 28)
-        except OSError:
-            font = ImageFont.load_default()
-        # The shell downsamples tray icons to 16x16; use large digits here and
-        # expose the full elapsed time in the tooltip.
-        label = f"{elapsed % 100:02d}"
-        draw.rounded_rectangle((7, 39, 57, 63), radius=4, fill=(30, 34, 42, 245))
-        box = draw.textbbox((0, 0), label, font=font)
-        text_x = (64 - (box[2] - box[0])) / 2 - box[0]
-        text_y = (39 + 64 - (box[3] - box[1])) / 2 - box[1]
-        draw.text((text_x, text_y), label, font=font, fill=(245, 245, 245, 255))
-        return image
+    def make_icon(mode: str) -> Image.Image:
+        asset_root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1])) / "resources"
+        asset = asset_root / ("m4-tts-playing.png" if mode == "playing" else "m4-tts.png")
+        with Image.open(asset) as source:
+            return source.convert("RGBA").resize((64, 64), Image.Resampling.LANCZOS)
 
     def stop_item(_icon: object, _item: object) -> None:
         stop_speech()
@@ -302,7 +284,7 @@ def tray() -> None:
         threading.Thread(target=show_settings, daemon=True).start()
 
     icon = pystray.Icon(
-        "selected-text-speech", make_icon("waiting", 0), "Озвучивание: готово",
+        "m4-tts", make_icon("waiting"), "M4-TTS — готово",
         menu=pystray.Menu(
             pystray.MenuItem("Остановить озвучивание", stop_item),
             pystray.MenuItem(f"Хоткей: {cfg['HOTKEY']}", None, enabled=False),
@@ -333,10 +315,10 @@ def tray() -> None:
                     started = time.time()
                 elapsed = max(0, int(time.time() - started))
                 playing = PLAYING.exists()
-                icon.icon = make_icon("playing" if playing else "waiting", elapsed)
+                icon.icon = make_icon("playing" if playing else "waiting")
                 icon.title = f"{'Идёт озвучивание' if playing else 'Ожидание TTS'} • {elapsed} с"
             else:
-                icon.icon = make_icon("waiting", 0)
+                icon.icon = make_icon("waiting")
                 icon.title = "Озвучивание текста • готово"
             time.sleep(1)
 

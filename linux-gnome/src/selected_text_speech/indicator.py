@@ -14,12 +14,12 @@ gi.require_version("AyatanaAppIndicator3", "0.1")
 from gi.repository import AyatanaAppIndicator3, GLib, Gtk
 
 
-icons_dir = Path(__file__).resolve().parents[2] / "share/icons"
-waiting_icon = str(icons_dir / "openclaw-tts-waiting.svg")
-waveform_icon = str(icons_dir / "openclaw-tts-waveform.svg")
+icons_dir = Path(__file__).resolve().parents[3] / "resources"
+waiting_icon = str(icons_dir / "m4-tts.svg")
+waveform_icon = str(icons_dir / "m4-tts-playing.svg")
 started_at = float(os.environ.get("SELECTED_TEXT_STARTED_MONOTONIC", time.monotonic()))
 indicator = AyatanaAppIndicator3.Indicator.new(
-    "openclaw-tts", waiting_icon, AyatanaAppIndicator3.IndicatorCategory.APPLICATION_STATUS
+    "m4-tts", waiting_icon, AyatanaAppIndicator3.IndicatorCategory.APPLICATION_STATUS
 )
 indicator.set_icon_full(waiting_icon, "Ожидание речи")
 indicator.set_title("Подготовка озвучивания")

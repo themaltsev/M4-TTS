@@ -3,8 +3,11 @@ name: Windows installer
 on:
   push:
     branches: [main]
+    tags: ['v*']
     paths:
       - 'windows/**'
+      - 'resources/**'
+      - 'README.md'
       - 'settings_gui.py'
       - 'requirements-piper.txt'
       - 'requirements-edge.txt'
@@ -36,6 +39,7 @@ jobs:
           --name selected-text-speech
           --collect-all edge_tts --collect-all piper --collect-all onnxruntime
           --collect-all pygame --collect-all pystray --collect-all PIL
+          --add-data "resources/m4-tts.png;resources" --add-data "resources/m4-tts-playing.png;resources"
           --hidden-import keyboard --hidden-import onnxruntime.capi.onnxruntime_pybind11_state
           windows/speech.py
       - name: Verify packaged Windows audio backend
@@ -91,7 +95,7 @@ jobs:
             throw 'Windows installer did not configure Alt+Escape as the default hotkey'
           }
 
-          $shortcutPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Selected Text Speech.lnk'
+          $shortcutPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\M4-TTS.lnk'
           if (-not (Test-Path $shortcutPath)) { throw "Missing Start Menu shortcut: $shortcutPath" }
           $shell = New-Object -ComObject WScript.Shell
           $shortcut = $shell.CreateShortcut($shortcutPath)
@@ -102,7 +106,7 @@ jobs:
             throw "Shortcut does not pass run-tray.vbs: $($shortcut.Arguments)"
           }
 
-          $uninstallShortcutPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Uninstall Selected Text Speech.lnk'
+          $uninstallShortcutPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Uninstall M4-TTS.lnk'
           if (-not (Test-Path $uninstallShortcutPath)) {
             throw "Missing uninstall shortcut: $uninstallShortcutPath"
           }
@@ -142,3 +146,25 @@ jobs:
           path: dist/install-windows.exe
           if-no-files-found: error
           retention-days: 30
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: install-windows
+          path: dist
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          name: M4-TTS ${{ github.ref_name }}
+          files: dist/install-windows.exe
+          body: |
+            Первый публичный релиз M4-TTS.
+
+            - Windows 10/11 x64: `install-windows.exe`.
+            - Ubuntu GNOME и macOS: инструкции установки — в [README](https://github.com/themaltsev/M4-TTS#установка).
+            - Пакеты `.deb` и `.dmg` пока не входят в этот релиз.

@@ -24,13 +24,14 @@ if [[ -z "$python_bin" ]]; then
   brew install python
   python_bin="$(brew --prefix python)/bin/python3"
 fi
-mkdir -p "$app_dir/state" "$config_dir" "$bin_dir" "$HOME/Library/LaunchAgents"
+mkdir -p "$app_dir/state" "$config_dir" "$app_dir/resources" "$bin_dir" "$HOME/Library/LaunchAgents"
 if [[ ! -x "$venv/bin/python" ]]; then
   "$python_bin" -m venv "$venv"
 fi
 "$venv/bin/python" -m pip install -r "$repo_dir/requirements-piper.txt" -r "$repo_dir/requirements-edge.txt" rumps pynput
 install -m 0644 "$repo_dir/macos/speech.py" "$app_dir/speech.py"
 install -m 0644 "$repo_dir/settings_gui.py" "$app_dir/settings_gui.py"
+install -m 0644 "$repo_dir/resources/m4-tts.png" "$app_dir/resources/m4-tts.png"
 "$venv/bin/python" "$repo_dir/scripts/download_voice.py" "$app_dir/models"
 
 if [[ ! -e "$config_dir/config.env" ]]; then

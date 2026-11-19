@@ -4,6 +4,8 @@
 
 ## Установка
 
+Готовые версии и загрузки: [GitHub Releases](https://github.com/themaltsev/M4-TTS/releases/latest).
+
 | Платформа | Установщик |
 |---|---|
 | Ubuntu GNOME | `./install-linux.sh` |
