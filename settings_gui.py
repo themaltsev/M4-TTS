@@ -38,7 +38,7 @@ def current_values(path: Path) -> dict[str, str]:
 
 def autostart_path() -> Path:
     if platform.system() == "Windows":
-        return Path(os.environ.get("APPDATA", Path.home())) / "Microsoft/Windows/Start Menu/Programs/Startup/Selected Text Speech.lnk"
+        return Path(os.environ.get("APPDATA", Path.home())) / "Microsoft/Windows/Start Menu/Programs/Startup/M4-TTS.lnk"
     if platform.system() == "Darwin":
         return Path.home() / "Library/LaunchAgents/com.themaltsev.selected-text-speech.plist"
     return Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "autostart/selected-text-speech.desktop"
@@ -59,14 +59,14 @@ def set_autostart(enabled: bool) -> None:
     if platform.system() == "Linux":
         root = Path(__file__).resolve().parent
         tray = root / "linux-gnome/bin/speak-tray"
-        target.write_text(f"[Desktop Entry]\nType=Application\nName=Selected Text Speech\nExec={tray}\nX-GNOME-Autostart-enabled=true\n", encoding="utf-8")
+        target.write_text(f"[Desktop Entry]\nType=Application\nName=M4-TTS\nExec={tray}\nX-GNOME-Autostart-enabled=true\n", encoding="utf-8")
     elif platform.system() == "Darwin":
         import plistlib
         script = Path(__file__).resolve().parent / "speech.py"
         target.write_bytes(plistlib.dumps({"Label": "com.themaltsev.selected-text-speech", "ProgramArguments": [sys.executable, str(script), "tray"], "RunAtLoad": True, "ProcessType": "Interactive", "EnvironmentVariables": {"PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"}}))
         subprocess.run(["launchctl", "bootstrap", f"gui/{os.getuid()}", str(target)], check=False)
     else:
-        command = "$w=New-Object -ComObject WScript.Shell; $s=$w.CreateShortcut($env:APPDATA + '\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\Selected Text Speech.lnk'); $s.TargetPath=$env:WINDIR + '\\System32\\wscript.exe'; $s.Arguments='\"' + $env:SELECTED_TEXT_SPEECH_VBS + '\" \"' + $env:SELECTED_TEXT_SPEECH_EXE + '\"'; $s.Save()"
+        command = "$w=New-Object -ComObject WScript.Shell; $s=$w.CreateShortcut($env:APPDATA + '\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\M4-TTS.lnk'); $s.TargetPath=$env:WINDIR + '\\System32\\wscript.exe'; $s.Arguments='\"' + $env:SELECTED_TEXT_SPEECH_VBS + '\" \"' + $env:SELECTED_TEXT_SPEECH_EXE + '\"'; $s.Save()"
         app_dir = Path(sys.executable).resolve().parent
         env = dict(os.environ, SELECTED_TEXT_SPEECH_EXE=str(app_dir / "selected-text-speech.exe"), SELECTED_TEXT_SPEECH_VBS=str(app_dir / "run-tray.vbs"))
         subprocess.run(["powershell.exe", "-NoProfile", "-Command", command], check=True, env=env)
@@ -97,7 +97,7 @@ def main() -> None:
     path = config_path()
     values = current_values(path)
     root = tk.Tk()
-    root.title("Настройки — Selected Text Speech")
+    root.title("Настройки — M4-TTS")
     root.resizable(False, False)
     frame = ttk.Frame(root, padding=18)
     frame.grid(sticky="nsew")
@@ -128,7 +128,7 @@ def main() -> None:
             return
         values.update(TTS_ENGINE=engine.get(), HOTKEY=hotkey.get().strip(), MPV_PLAYBACK_SPEED=str(parsed_speed))
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("# Настройки Selected Text Speech\n" + "".join(f"{k}={v}\n" for k, v in values.items()), encoding="utf-8")
+        path.write_text("# Настройки M4-TTS\n" + "".join(f"{k}={v}\n" for k, v in values.items()), encoding="utf-8")
         try:
             if platform.system() == "Linux":
                 apply_linux_hotkey(hotkey.get().strip())

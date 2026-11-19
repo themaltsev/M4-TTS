@@ -1,4 +1,4 @@
-#define AppName "Selected Text Speech"
+#define AppName "M4-TTS"
 #define AppVersion "1.0.0"
 #define AppExe "selected-text-speech.exe"
 
@@ -36,8 +36,8 @@ Source: "run-tray.vbs"; DestDir: "{app}"; Flags: ignoreversion
 Source: "uninstall-windows.cmd"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{userprograms}\Selected Text Speech"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\run-tray.vbs"" ""{app}\{#AppExe}"""; WorkingDir: "{app}"
-Name: "{userprograms}\Uninstall Selected Text Speech"; Filename: "{sys}\cmd.exe"; Parameters: "/c ""{app}\uninstall-windows.cmd"""; WorkingDir: "{app}"
+Name: "{userprograms}\M4-TTS"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\run-tray.vbs"" ""{app}\{#AppExe}"""; WorkingDir: "{app}"
+Name: "{userprograms}\Uninstall M4-TTS"; Filename: "{sys}\cmd.exe"; Parameters: "/c ""{app}\uninstall-windows.cmd"""; WorkingDir: "{app}"
 
 [Run]
 Filename: "{sys}\wscript.exe"; Parameters: """{app}\run-tray.vbs"" ""{app}\{#AppExe}"""; Flags: skipifsilent nowait

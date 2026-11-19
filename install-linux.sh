@@ -96,7 +96,7 @@ if [[ "$key_path" != /* ]]; then
   exit 1
 fi
 key_schema="$custom_schema:$key_path"
-gsettings set "$key_schema" name "'Selected text speech'"
+gsettings set "$key_schema" name "'M4-TTS'"
 gsettings set "$key_schema" command "'$repo_dir/linux-gnome/bin/speak-selection'"
 gsettings set "$key_schema" binding "'<Super>Escape'"
 
@@ -112,7 +112,7 @@ mkdir -p "$applications_dir"
 cat > "$applications_dir/selected-text-speech.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Selected Text Speech
+Name=M4-TTS
 Comment=Озвучивание выделенного текста
 Exec=$repo_dir/linux-gnome/bin/speak-tray
 Icon=audio-speakers
@@ -122,7 +122,7 @@ EOF
 cat > "$applications_dir/selected-text-speech-settings.desktop" <<EOF
 [Desktop Entry]
 Type=Application
-Name=Selected Text Speech — Настройки
+Name=M4-TTS — Настройки
 Exec=/usr/bin/python3 $repo_dir/settings_gui.py
 Icon=preferences-system
 Terminal=false
@@ -132,6 +132,6 @@ EOF
 echo
 echo "Установка завершена. Хоткей: Super (⌘ на клавиатуре Mac) + Escape."
 echo "Автозапуск выключен; его можно переключить в Настройках приложения."
-echo "Открой Selected Text Speech через меню приложений, чтобы появился значок в верхней панели."
+echo "Открой M4-TTS через меню приложений, чтобы появился значок в верхней панели."
 echo "Движок выбирается через TTS_ENGINE=piper или TTS_ENGINE=edge в config.local.env."
 echo "Код, модели, настройки и журнал остаются внутри checkout."
