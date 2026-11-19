@@ -15,6 +15,7 @@ from gi.repository import AyatanaAppIndicator3, GLib, Gtk
 
 
 icons_dir = Path(__file__).resolve().parents[3] / "resources"
+repo_dir = Path(__file__).resolve().parents[3]
 waiting_icon = str(icons_dir / "m4-tts.svg")
 waveform_icon = str(icons_dir / "m4-tts-playing.svg")
 started_at = float(os.environ.get("SELECTED_TEXT_STARTED_MONOTONIC", time.monotonic()))
@@ -28,7 +29,7 @@ status = Gtk.MenuItem(label="Подготовка озвучивания")
 status.set_sensitive(False)
 menu.append(status)
 settings_item = Gtk.MenuItem(label="Настройки…")
-settings_item.connect("activate", lambda *_: subprocess.Popen([sys.executable, "-m", "selected_text_speech.settings_gui"]))
+settings_item.connect("activate", lambda *_: subprocess.Popen([sys.executable, str(repo_dir / "settings_gui.py")]))
 menu.append(settings_item)
 menu.show_all()
 indicator.set_menu(menu)
