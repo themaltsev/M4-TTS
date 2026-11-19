@@ -317,8 +317,9 @@ def tray() -> None:
             self.stop_item = rumps.MenuItem("Остановить озвучивание", callback=self.stop_speech)
             self.hotkey_item = rumps.MenuItem(f"Хоткей: {cfg['HOTKEY']}")
             self.hotkey_item.set_callback(None)
+            self.settings_item = rumps.MenuItem("Настройки…", callback=self.open_settings)
             self.quit_item = rumps.MenuItem("Выход", callback=lambda _sender: rumps.quit_application())
-            self.menu = [self.stop_item, self.hotkey_item, None, self.quit_item]
+            self.menu = [self.stop_item, self.hotkey_item, self.settings_item, None, self.quit_item]
             self.timer = rumps.Timer(self.update_status, 1)
             self.timer.start()
 
@@ -341,6 +342,9 @@ def tray() -> None:
         def stop_speech(self, _sender: object) -> None:
             stop()
             self.title = "◷"
+
+        def open_settings(self, _sender: object) -> None:
+            subprocess.Popen([sys.executable, str(Path(__file__).resolve().with_name("settings_gui.py"))])
 
     SpeechApp().run()
 

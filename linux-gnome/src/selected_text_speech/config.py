@@ -13,7 +13,8 @@ def project_root() -> Path:
 
 def config_files() -> tuple[Path, Path]:
     root = project_root()
-    return root / "config.local.env", root / "config.env"
+    user_config = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "selected-text-speech" / "config.env"
+    return user_config, root / "config.local.env", root / "config.env"
 
 
 def _load_env_file() -> None:

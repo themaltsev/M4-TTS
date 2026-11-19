@@ -30,6 +30,7 @@ if [[ ! -x "$venv/bin/python" ]]; then
 fi
 "$venv/bin/python" -m pip install -r "$repo_dir/requirements-piper.txt" -r "$repo_dir/requirements-edge.txt" rumps pynput
 install -m 0644 "$repo_dir/macos/speech.py" "$app_dir/speech.py"
+install -m 0644 "$repo_dir/settings_gui.py" "$app_dir/settings_gui.py"
 "$venv/bin/python" "$repo_dir/scripts/download_voice.py" "$app_dir/models"
 
 if [[ ! -e "$config_dir/config.env" ]]; then
@@ -65,42 +66,10 @@ EOF
   chmod 0755 "$bin_dir/$command_name"
 done
 
-mpv_dir="$(dirname "$(command -v mpv)")"
-"$venv/bin/python" - "$launch_agent" "$venv/bin/python" "$app_dir/speech.py" "$app_dir/state/tray.stdout.log" "$app_dir/state/tray.stderr.log" "$mpv_dir:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" "$label" <<'PY'
-import plistlib
-import sys
-from pathlib import Path
-
-plist_path, python, script, stdout_path, stderr_path, path, label = sys.argv[1:]
-data = {
-    "Label": label,
-    "ProgramArguments": [python, script, "tray"],
-    "RunAtLoad": True,
-    "ProcessType": "Interactive",
-    "EnvironmentVariables": {"PATH": path},
-    "StandardOutPath": stdout_path,
-    "StandardErrorPath": stderr_path,
-}
-target = Path(plist_path)
-target.parent.mkdir(parents=True, exist_ok=True)
-target.write_bytes(plistlib.dumps(data))
-PY
-
-launchctl bootout "gui/$(id -u)" "$launch_agent" >/dev/null 2>&1 || true
-autostart_answer=n
-if [[ -r /dev/tty ]]; then
-  read -r -p "Добавить приложение в автозапуск macOS при входе? [y/n] " autostart_answer </dev/tty || autostart_answer=n
-else
-  echo "Терминал недоступен: автозапуск не включён."
-fi
-if [[ "$autostart_answer" =~ ^[YyДд]$ ]]; then
-  launchctl bootstrap "gui/$(id -u)" "$launch_agent"
-  launchctl kickstart -k "gui/$(id -u)/$label"
-  echo "Автозапуск включён."
-else
-  rm -f "$launch_agent"
-  echo "Автозапуск не включён. Чтобы запустить значок вручную: selected-text-speech-tray"
-fi
+echo "Автозапуск по умолчанию выключен; управляется чекбоксом в Настройках приложения."
+echo "Запуск значка вручную: selected-text-speech-tray"
+nohup "$venv/bin/python" "$app_dir/speech.py" tray >> "$app_dir/state/tray.stdout.log" 2>> "$app_dir/state/tray.stderr.log" </dev/null &
+echo "Значок приложения запущен в строке меню."
 
 echo "Установка завершена. Хоткей: смотри $config_dir/config.env (по умолчанию cmd+esc)."
 echo "Команды размещены внутри приложения: $bin_dir (PATH и ~/.local/bin не меняются)."

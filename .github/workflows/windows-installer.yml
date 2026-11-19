@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'windows/**'
+      - 'settings_gui.py'
       - 'requirements-piper.txt'
       - 'requirements-edge.txt'
       - 'scripts/download_voice.py'

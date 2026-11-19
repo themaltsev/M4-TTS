@@ -4,6 +4,8 @@ import os
 import signal
 import time
 from pathlib import Path
+import subprocess
+import sys
 
 import gi
 
@@ -25,6 +27,9 @@ menu = Gtk.Menu()
 status = Gtk.MenuItem(label="Подготовка озвучивания")
 status.set_sensitive(False)
 menu.append(status)
+settings_item = Gtk.MenuItem(label="Настройки…")
+settings_item.connect("activate", lambda *_: subprocess.Popen([sys.executable, "-m", "selected_text_speech.settings_gui"]))
+menu.append(settings_item)
 menu.show_all()
 indicator.set_menu(menu)
 indicator.set_status(AyatanaAppIndicator3.IndicatorStatus.ACTIVE)

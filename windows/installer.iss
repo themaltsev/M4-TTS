@@ -56,7 +56,7 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  ConfigPath, DefaultConfig, StartupLink, ShortcutParameters: String;
+  ConfigPath, DefaultConfig: String;
   ExistingConfig: AnsiString;
 begin
   if CurStep = ssPostInstall then
@@ -91,20 +91,6 @@ begin
         SaveStringToFile(ConfigPath, #13#10 + 'HOTKEY=alt+esc'#13#10, True);
     end;
 
-    if not WizardSilent then
-    begin
-      StartupLink := ExpandConstant('{userstartup}\Selected Text Speech.lnk');
-      if MsgBox('Добавить Selected Text Speech в автозапуск при входе в Windows?',
-        mbConfirmation, MB_YESNO) = IDYES then
-      begin
-        ShortcutParameters := ExpandConstant('"{app}\run-tray.vbs" "{app}\{#AppExe}"');
-        CreateShellLink(StartupLink, 'Selected Text Speech',
-          ExpandConstant('{sys}\wscript.exe'), ShortcutParameters,
-          ExpandConstant('{app}'), '', 0, SW_SHOWNORMAL);
-      end
-      else
-        DeleteFile(StartupLink);
-    end;
   end;
 end;
 

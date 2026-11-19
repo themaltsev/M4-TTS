@@ -297,11 +297,16 @@ def tray() -> None:
         keyboard.unhook_all_hotkeys()
         icon.stop()
 
+    def settings_item(_icon: object, _item: object) -> None:
+        from settings_gui import main as show_settings
+        threading.Thread(target=show_settings, daemon=True).start()
+
     icon = pystray.Icon(
         "selected-text-speech", make_icon("waiting", 0), "Озвучивание: готово",
         menu=pystray.Menu(
             pystray.MenuItem("Остановить озвучивание", stop_item),
             pystray.MenuItem(f"Хоткей: {cfg['HOTKEY']}", None, enabled=False),
+            pystray.MenuItem("Настройки…", settings_item),
             pystray.MenuItem("Выход", quit_item),
         ),
     )
@@ -349,6 +354,10 @@ def tray() -> None:
 
 def main() -> int:
     args = sys.argv[1:]
+    if args == ["settings"]:
+        from settings_gui import main as show_settings
+        show_settings()
+        return 0
     if args == ["--verify-audio-backend"]:
         import winsound
         import pygame

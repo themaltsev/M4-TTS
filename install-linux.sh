@@ -3,6 +3,8 @@ set -euo pipefail
 
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 model_dir="$repo_dir/models"
+install_system_packages=1
+if [[ "${1:-}" == "--skip-system-packages" ]]; then install_system_packages=0; fi
 
 if [[ "$(id -u)" -eq 0 ]]; then
   echo "Запусти ./install-linux.sh от своего пользователя из графического сеанса, не через sudo." >&2
@@ -21,23 +23,27 @@ if ! command -v sudo >/dev/null; then
   exit 1
 fi
 
-sudo apt-get update
-sudo apt-get install -y --no-remove --no-upgrade \
-  gir1.2-ayatanaappindicator3-0.1 \
-  gir1.2-gtk-3.0 \
-  gnome-session-canberra \
-  libnotify-bin \
-  libcanberra-gtk3-module \
-  mpv \
-  curl \
-  python3-venv \
-  python3-gi \
-  wl-clipboard \
-  xclip \
-  yaru-theme-sound
+if (( install_system_packages )); then
+  sudo apt-get update
+  sudo apt-get install -y --no-remove --no-upgrade \
+    gir1.2-ayatanaappindicator3-0.1 \
+    gir1.2-gtk-3.0 \
+    gnome-session-canberra \
+    libnotify-bin \
+    libcanberra-gtk3-module \
+    mpv \
+    curl \
+    python3-venv \
+    python3-gi \
+    python3-tk \
+    wl-clipboard \
+    xclip \
+    yaru-theme-sound
+fi
 
 # Keep Python dependencies, voice model, user config and runtime state in this checkout.
 mkdir -p "$repo_dir/.runtime" "$model_dir"
+chmod 0755 "$repo_dir/linux-gnome/bin/speak-tray"
 if [[ ! -x "$repo_dir/.venv/bin/python" ]]; then
   python3 -m venv "$repo_dir/.venv"
 fi
@@ -101,31 +107,31 @@ if [[ -d "/usr/share/gnome-shell/extensions/$indicator_extension" ]] && command 
   fi
 fi
 
-echo
-autostart_answer=n
-if [[ -r /dev/tty ]]; then
-  read -r -p "Добавить хоткей Super+Escape в GNOME? [y/n] " autostart_answer </dev/tty || autostart_answer=n
-else
-  echo "Терминал недоступен: существующая привязка хоткея оставлена без изменений."
-fi
-if [[ "$autostart_answer" =~ ^[YyДд]$ ]]; then
-  echo "Хоткей включён и запускает исходники проекта напрямую."
-elif [[ -r /dev/tty ]]; then
-  current_key_list="$(gsettings get org.gnome.settings-daemon.plugins.media-keys custom-keybindings)"
-  cleaned_key_list="$(python3 - "$current_key_list" "$key_path" <<'PY'
-import ast
-import sys
-raw, remove_path = sys.argv[1:]
-if raw.startswith("@as"):
-    raw = raw[3:].strip()
-paths = [path for path in ast.literal_eval(raw) if path != remove_path]
-print("[" + ", ".join(repr(path) for path in paths) + "]")
-PY
-)"
-  gsettings set org.gnome.settings-daemon.plugins.media-keys custom-keybindings "$cleaned_key_list"
-  echo "Хоткей отключён; команды можно запускать вручную из проекта."
-fi
+applications_dir="$HOME/.local/share/applications"
+mkdir -p "$applications_dir"
+cat > "$applications_dir/selected-text-speech.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Selected Text Speech
+Comment=Озвучивание выделенного текста
+Exec=$repo_dir/linux-gnome/bin/speak-tray
+Icon=audio-speakers
+Terminal=false
+Categories=Utility;Accessibility;
+EOF
+cat > "$applications_dir/selected-text-speech-settings.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Selected Text Speech — Настройки
+Exec=/usr/bin/python3 $repo_dir/settings_gui.py
+Icon=preferences-system
+Terminal=false
+Categories=Utility;Accessibility;
+EOF
+
 echo
 echo "Установка завершена. Хоткей: Super (⌘ на клавиатуре Mac) + Escape."
+echo "Автозапуск выключен; его можно переключить в Настройках приложения."
+echo "Открой Selected Text Speech через меню приложений, чтобы появился значок в верхней панели."
 echo "Движок выбирается через TTS_ENGINE=piper или TTS_ENGINE=edge в config.local.env."
 echo "Код, модели, настройки и журнал остаются внутри checkout."
