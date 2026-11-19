@@ -39,7 +39,7 @@ TTS_ENGINE=edge
 
 - **Linux/GNOME:** `Super+Escape` по умолчанию; выбор выделения через Wayland clipboard или X11 clipboard; пустое выделение сообщает через `notify-send`.
 - **macOS:** `cmd+esc`; menu-bar приложение и системное уведомление Notification Center; для чтения выделения нужны разрешения Accessibility/Input Monitoring.
-- **Windows:** `ctrl+alt+s`; tray-приложение, clipboard возвращается после чтения; уведомление показывается через системный tray notification.
+- **Windows:** `alt+esc` (Alt+Escape); tray-приложение, clipboard возвращается после чтения; уведомление показывается через системный tray notification.
 
 Глобальный хоткей и системные API имеют платформенные реализации, но движок, параметры голоса, остановка и сценарий пустого выделения одинаковы.
 

@@ -57,8 +57,12 @@ jobs:
           $runner = Join-Path $installDir 'run-tray.vbs'
           $uninstaller = Join-Path $installDir 'unins000.exe'
           $uninstallCommand = Join-Path $installDir 'uninstall-windows.cmd'
+          $config = Join-Path $env:APPDATA 'selected-text-speech\config.env'
           foreach ($path in @($appExe, $runner, $uninstaller, $uninstallCommand)) {
             if (-not (Test-Path $path)) { throw "Missing installed file: $path" }
+          }
+          if (-not (Select-String -Path $config -Pattern '^HOTKEY=alt\+esc$' -Quiet)) {
+            throw 'Windows installer did not configure Alt+Escape as the default hotkey'
           }
 
           $shortcutPath = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Selected Text Speech.lnk'

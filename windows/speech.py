@@ -34,7 +34,7 @@ def settings() -> dict[str, str]:
         "MPV_PLAYBACK_SPEED": "1.35", "MPV_PLAYBACK_VOLUME": "100",
         "API_MAX_ATTEMPTS": "3", "API_RETRY_BASE_SECONDS": "1.5",
         "API_RETRY_MAX_SECONDS": "8", "MPV_PATH": "mpv",
-        "HOTKEY": "ctrl+alt+s",
+        "HOTKEY": "alt+esc",
     }
     try:
         for line in CONFIG.read_text(encoding="utf-8").splitlines():

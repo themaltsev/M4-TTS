@@ -77,7 +77,7 @@ begin
       'API_MAX_ATTEMPTS=3'#13#10 +
       'API_RETRY_BASE_SECONDS=1.5'#13#10 +
       'API_RETRY_MAX_SECONDS=8'#13#10 +
-      'HOTKEY=ctrl+alt+s'#13#10;
+      'HOTKEY=alt+esc'#13#10;
     if not FileExists(ConfigPath) then
       SaveStringToFile(ConfigPath, DefaultConfig, False)
     else if LoadStringFromFile(ConfigPath, ExistingConfig) then
@@ -88,7 +88,7 @@ begin
           '# Поменяй значение TTS_ENGINE и сохрани файл для переключения.'#13#10 +
           'TTS_ENGINE=piper'#13#10 + 'PIPER_MODEL=models\ru_RU-irina-medium.onnx'#13#10, True);
       if Pos('HOTKEY=', Uppercase(String(ExistingConfig))) = 0 then
-        SaveStringToFile(ConfigPath, #13#10 + 'HOTKEY=ctrl+alt+s'#13#10, True);
+        SaveStringToFile(ConfigPath, #13#10 + 'HOTKEY=alt+esc'#13#10, True);
     end;
 
     if not WizardSilent then
