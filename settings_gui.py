@@ -105,9 +105,9 @@ def main() -> None:
 
     engine = tk.StringVar(value=values.get("TTS_ENGINE", "piper"))
     hotkey = tk.StringVar(value=values.get("HOTKEY", "alt+esc" if platform.system() == "Windows" else "cmd+esc" if platform.system() == "Darwin" else "super+escape"))
-    ttk.Label(frame, text="Движок").grid(row=1, column=0, sticky="w", padx=(0, 16), pady=5)
+    ttk.Label(frame, text="Движок озвучки").grid(row=1, column=0, sticky="w", padx=(0, 16), pady=5)
     ttk.Combobox(frame, textvariable=engine, values=("piper", "edge"), state="readonly", width=24).grid(row=1, column=1, sticky="ew", pady=5)
-    ttk.Label(frame, text="Глобальный хоткей").grid(row=2, column=0, sticky="w", padx=(0, 16), pady=5)
+    ttk.Label(frame, text="Комбинация клавиш").grid(row=2, column=0, sticky="w", padx=(0, 16), pady=5)
     ttk.Entry(frame, textvariable=hotkey, width=27).grid(row=2, column=1, sticky="ew", pady=5)
     speed = tk.StringVar(value=values.get("MPV_PLAYBACK_SPEED", "1.35"))
     ttk.Label(frame, text="Скорость речи").grid(row=3, column=0, sticky="w", padx=(0, 16), pady=5)
