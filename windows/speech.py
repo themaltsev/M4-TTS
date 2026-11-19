@@ -22,6 +22,15 @@ STARTED = STATE / "started-at"
 PLAYING = STATE / "playing"
 LOG = STATE / "tts.log"
 
+# One-file PyInstaller puts pygame's native extensions and DLLs in separate
+# directories. Add both explicitly to the Windows DLL search path before any
+# audio-backend module is imported.
+_DLL_DIRECTORY_HANDLES = []
+if sys.platform == "win32" and getattr(sys, "frozen", False) and hasattr(os, "add_dll_directory"):
+    for _directory in (Path(sys._MEIPASS), Path(sys._MEIPASS) / "pygame"):
+        if _directory.is_dir():
+            _DLL_DIRECTORY_HANDLES.append(os.add_dll_directory(str(_directory)))
+
 
 def settings() -> dict[str, str]:
     values = {
@@ -324,6 +333,10 @@ def tray() -> None:
 
 def main() -> int:
     args = sys.argv[1:]
+    if args == ["--verify-audio-backend"]:
+        import pygame
+        print(f"pygame {pygame.version.ver}")
+        return 0
     if args == ["--worker"]:
         text = sys.stdin.buffer.read().decode("utf-8", errors="replace")
         try: return asyncio.run(worker(text))

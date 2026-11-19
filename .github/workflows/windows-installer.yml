@@ -37,6 +37,13 @@ jobs:
           --collect-all pygame --collect-all pystray --collect-all PIL
           --hidden-import keyboard --hidden-import onnxruntime.capi.onnxruntime_pybind11_state
           windows/speech.py
+      - name: Verify packaged Windows audio backend
+        shell: pwsh
+        run: |
+          & (Resolve-Path 'dist/selected-text-speech.exe') --verify-audio-backend
+          if ($LASTEXITCODE -ne 0) {
+            throw "Packaged pygame audio backend failed to load: $LASTEXITCODE"
+          }
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
       - name: Build installer
