@@ -140,16 +140,20 @@ def piper_audio_file(text: str, cfg: dict[str, str]) -> Path:
 
 
 async def worker(text: str) -> int:
-    import pygame
-
     cfg = settings()
     max_attempts = max(1, min(8, int(cfg["API_MAX_ATTEMPTS"])))
     for attempt in range(1, max_attempts + 1):
         audio_path: Path | None = None
+        pygame = None
         try:
             engine = cfg["TTS_ENGINE"].strip().lower()
             if engine == "piper":
                 audio_path = piper_audio_file(text, cfg)
+                if os.name == "nt":
+                    import winsound
+                    PLAYING.write_text(str(time.time()), encoding="ascii")
+                    winsound.PlaySound(str(audio_path), winsound.SND_FILENAME)
+                    return 0
             elif engine == "edge":
                 import edge_tts
                 audio = bytearray()
@@ -167,6 +171,7 @@ async def worker(text: str) -> int:
             else:
                 raise ValueError("TTS_ENGINE должен быть piper или edge")
 
+            import pygame
             pygame.mixer.init()
             pygame.mixer.music.load(str(audio_path))
             pygame.mixer.music.set_volume(max(0, min(100, int(cfg["MPV_PLAYBACK_VOLUME"]))) / 100)
@@ -178,10 +183,11 @@ async def worker(text: str) -> int:
             return 0
         except Exception as exc:
             PLAYING.unlink(missing_ok=True)
-            try:
-                pygame.mixer.quit()
-            except Exception:
-                pass
+            if pygame is not None:
+                try:
+                    pygame.mixer.quit()
+                except Exception:
+                    pass
             with LOG.open("a", encoding="utf-8") as log:
                 log.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S%z')} ATTEMPT {attempt} {type(exc).__name__}: {exc}\n")
             if attempt >= max_attempts:
@@ -334,9 +340,17 @@ def tray() -> None:
 def main() -> int:
     args = sys.argv[1:]
     if args == ["--verify-audio-backend"]:
+        import winsound
         import pygame
-        print(f"pygame {pygame.version.ver}")
+        print(f"winsound ready; pygame {pygame.version.ver}")
         return 0
+    if args == ["--verify-local-piper"]:
+        audio_path = piper_audio_file("Проверка локального голоса", settings())
+        try:
+            print(f"Piper WAV ready: {audio_path.stat().st_size} bytes")
+            return 0
+        finally:
+            audio_path.unlink(missing_ok=True)
     if args == ["--worker"]:
         text = sys.stdin.buffer.read().decode("utf-8", errors="replace")
         try: return asyncio.run(worker(text))

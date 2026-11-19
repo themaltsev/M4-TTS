@@ -44,6 +44,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Packaged pygame audio backend failed to load: $LASTEXITCODE"
           }
+          & (Resolve-Path 'dist/selected-text-speech.exe') --verify-local-piper
+          if ($LASTEXITCODE -ne 0) {
+            throw "Packaged local Piper synthesis failed: $LASTEXITCODE"
+          }
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
       - name: Build installer
